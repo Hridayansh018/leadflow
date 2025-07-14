@@ -1,17 +1,17 @@
+import { supabase } from './supabase';
+
 export interface Lead {
-  _id?: string;
+  id?: string;
+  user_id: string;
   name: string;
   email: string;
   phone: string;
-  property: string;
-  interest: 'high' | 'medium' | 'low';
   status: 'new' | 'contacted' | 'qualified' | 'converted' | 'lost';
-  requestedCallback: boolean;
   notes?: string;
-  campaignId?: string;
-  lastContactDate?: Date;
-  createdAt?: Date;
-  updatedAt?: Date;
+  interest?: 'high' | 'medium' | 'low';
+  requestedCallback?: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface LeadResponse {
@@ -24,85 +24,142 @@ export interface LeadResponse {
   };
 }
 
-// Refactored: All lead data is now stored in outreach.storage as StorageRecord documents.
-// Use createRecord('lead', ...), getRecords('lead'), etc. for all lead operations.
-// TODO: Replace all collection-specific service calls with generic storage API calls.
 class LeadService {
-  private baseURL = '/api/leads';
-
   // Get all leads with optional filtering
   async getLeads(params?: {
     status?: string;
-    interest?: string;
+    user_id?: string;
     page?: number;
     limit?: number;
   }): Promise<LeadResponse> {
-    const searchParams = new URLSearchParams();
-    if (params?.status) searchParams.append('status', params.status);
-    if (params?.interest) searchParams.append('interest', params.interest);
-    if (params?.page) searchParams.append('page', params.page.toString());
-    if (params?.limit) searchParams.append('limit', params.limit.toString());
+    try {
+      let query = supabase
+        .from('leads')
+        .select('*', { count: 'exact' });
 
-    const response = await fetch(`${this.baseURL}?${searchParams}`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch leads');
-    }
-    return response.json();
-  }
+      if (params?.status) {
+        query = query.eq('status', params.status);
+      }
+      if (params?.user_id) {
+        query = query.eq('user_id', params.user_id);
+      }
 
-  // Get a single lead by ID
-  async getLead(id: string): Promise<Lead> {
-    const response = await fetch(`${this.baseURL}/${id}`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch lead');
+      const page = params?.page || 1;
+      const limit = params?.limit || 10;
+      const offset = (page - 1) * limit;
+
+      query = query.range(offset, offset + limit - 1);
+      query = query.order('created_at', { ascending: false });
+
+      const { data: leads, error, count } = await query;
+
+      if (error) {
+        throw new Error('Failed to fetch leads');
+      }
+
+      return {
+        leads: leads || [],
+        pagination: {
+          page,
+          limit,
+          total: count || 0,
+          pages: Math.ceil((count || 0) / limit)
+        }
+      };
+    } catch (error) {
+      console.error('Error fetching leads:', error);
+      throw error;
     }
-    return response.json();
   }
 
   // Create a new lead
-  async createLead(lead: Omit<Lead, '_id' | 'createdAt' | 'updatedAt'>): Promise<Lead> {
-    const response = await fetch(this.baseURL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(lead),
-    });
-    if (!response.ok) {
-      throw new Error('Failed to create lead');
+  async createLead(lead: Omit<Lead, 'id' | 'created_at' | 'updated_at'>): Promise<Lead> {
+    try {
+      const { data, error } = await supabase
+        .from('leads')
+        .insert({
+          ...lead,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (error) {
+        throw new Error('Failed to create lead');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error creating lead:', error);
+      throw error;
     }
-    return response.json();
   }
 
   // Update a lead
   async updateLead(id: string, updates: Partial<Lead>): Promise<Lead> {
-    const response = await fetch(`${this.baseURL}/${id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(updates),
-    });
-    if (!response.ok) {
-      throw new Error('Failed to update lead');
+    try {
+      const { data, error } = await supabase
+        .from('leads')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        throw new Error('Failed to update lead');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error updating lead:', error);
+      throw error;
     }
-    return response.json();
   }
 
   // Delete a lead
-  async deleteLead(id: string): Promise<void> {
-    const response = await fetch(`${this.baseURL}/${id}`, {
-      method: 'DELETE',
-    });
-    if (!response.ok) {
-      throw new Error('Failed to delete lead');
+  async deleteLead(id: string): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('leads')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        throw new Error('Failed to delete lead');
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error deleting lead:', error);
+      throw error;
     }
   }
 
-  // Bulk create leads from data
-  async bulkCreateLeads(leads: Omit<Lead, '_id' | 'createdAt' | 'updatedAt'>[]): Promise<Lead[]> {
-    const promises = leads.map(lead => this.createLead(lead));
-    return Promise.all(promises);
+  // Get a single lead by ID
+  async getLead(id: string): Promise<Lead | null> {
+    try {
+      const { data, error } = await supabase
+        .from('leads')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return null; // Lead not found
+        }
+        throw new Error('Failed to fetch lead');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error fetching lead:', error);
+      throw error;
+    }
   }
 }
 

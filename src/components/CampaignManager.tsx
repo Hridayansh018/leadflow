@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Play, Pause, StopCircle, Trash2, Eye, BarChart3, AlertTriangle, TrendingUp, Users, Phone, CheckCircle, FileText, Clock, UserPlus, PhoneCall } from 'lucide-react';
 import vapiService from '../services/vapiService';
 import CampaignCreator from './CampaignCreator';
+import { showSuccess, showError, showWarning } from '../utils/toastUtils';
 
 interface Campaign {
   id: string;
@@ -50,6 +51,8 @@ interface CampaignTemplate {
   variables: string[];
 }
 
+
+
 export default function CampaignManager() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(false);
@@ -62,6 +65,7 @@ export default function CampaignManager() {
   const [templates] = useState<CampaignTemplate[]>(vapiService.getCampaignTemplates());
   const [selectedTemplate, setSelectedTemplate] = useState<CampaignTemplate | null>(null);
   const [templateVariables, setTemplateVariables] = useState<Record<string, string>>({});
+
 
   useEffect(() => {
     loadCampaigns();
@@ -224,142 +228,85 @@ export default function CampaignManager() {
     setTemplateVariables(templateVars);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'active':
-        return 'bg-green-100 text-green-800 border-green-200';
-      case 'paused':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'completed':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'scheduled':
-        return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 'failed':
-        return 'bg-red-100 text-red-800 border-red-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
+
 
   const getStatusIcon = (status: string) => {
     switch (status.toLowerCase()) {
       case 'active':
-        return <Play className="h-4 w-4" />;
+        return <Play className="h-4 w-4 text-green-500" />;
       case 'paused':
-        return <Pause className="h-4 w-4" />;
+        return <Pause className="h-4 w-4 text-yellow-500" />;
       case 'completed':
-        return <BarChart3 className="h-4 w-4" />;
-      case 'scheduled':
-        return <Eye className="h-4 w-4" />;
+        return <CheckCircle className="h-4 w-4 text-blue-500" />;
       case 'failed':
-        return <AlertTriangle className="h-4 w-4" />;
+        return <AlertTriangle className="h-4 w-4 text-red-500" />;
       default:
-        return <Eye className="h-4 w-4" />;
+        return <Clock className="h-4 w-4 text-gray-500" />;
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'active':
+        return 'border-green-500 text-green-700 bg-green-50';
+      case 'paused':
+        return 'border-yellow-500 text-yellow-700 bg-yellow-50';
+      case 'completed':
+        return 'border-blue-500 text-blue-700 bg-blue-50';
+      case 'failed':
+        return 'border-red-500 text-red-700 bg-red-50';
+      default:
+        return 'border-gray-500 text-gray-700 bg-gray-50';
+    }
   };
 
   const canPause = (status: string) => status === 'active';
   const canResume = (status: string) => status === 'paused';
   const canStop = (status: string) => ['active', 'paused'].includes(status);
-  const canDelete = (status: string) => ['completed', 'failed', 'paused'].includes(status);
+  const canDelete = (status: string) => ['completed', 'failed'].includes(status);
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString();
+  };
 
   const renderAnalytics = () => {
     if (!analytics) return null;
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-gray-900 rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-          <div className="flex items-center justify-between p-6 border-b border-gray-700">
-            <div className="flex items-center">
-              <BarChart3 className="h-6 w-6 text-blue-400 mr-3" />
-              <h2 className="text-xl font-bold text-white">Campaign Analytics</h2>
-            </div>
+        <div className="bg-gray-800 rounded-lg p-6 w-full max-w-6xl max-h-[90vh] overflow-y-auto">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-semibold text-white">Campaign Analytics</h3>
             <button
               onClick={() => setShowAnalytics(false)}
               className="text-gray-400 hover:text-white"
             >
-              ×
+              ✕
             </button>
           </div>
 
-          <div className="p-6">
-            {/* Key Metrics */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
-                <div className="flex items-center">
-                  <Phone className="h-5 w-5 text-blue-400 mr-2" />
-                  <span className="text-gray-300 text-sm">Total Calls</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="bg-gray-700 p-4 rounded-lg">
+              <div className="text-2xl font-bold text-white">{analytics.totalCalls}</div>
+              <div className="text-sm text-gray-300">Total Calls</div>
                 </div>
-                <p className="text-2xl font-bold text-white">{analytics.totalCalls}</p>
+            <div className="bg-gray-700 p-4 rounded-lg">
+              <div className="text-2xl font-bold text-green-400">{analytics.answeredCalls}</div>
+              <div className="text-sm text-gray-300">Answered Calls</div>
               </div>
-              
-              <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
-                <div className="flex items-center">
-                  <CheckCircle className="h-5 w-5 text-green-400 mr-2" />
-                  <span className="text-gray-300 text-sm">Answered</span>
-                </div>
-                <p className="text-2xl font-bold text-white">{analytics.answeredCalls}</p>
-              </div>
-              
-              <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
-                <div className="flex items-center">
-                  <TrendingUp className="h-5 w-5 text-purple-400 mr-2" />
-                  <span className="text-gray-300 text-sm">Answer Rate</span>
-                </div>
-                <p className="text-2xl font-bold text-white">{analytics.answerRate.toFixed(1)}%</p>
-              </div>
-              
-              <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
-                <div className="flex items-center">
-                  <Users className="h-5 w-5 text-orange-400 mr-2" />
-                  <span className="text-gray-300 text-sm">Conversions</span>
-                </div>
-                <p className="text-2xl font-bold text-white">{analytics.conversionRate.toFixed(1)}%</p>
+            <div className="bg-gray-700 p-4 rounded-lg">
+              <div className="text-2xl font-bold text-blue-400">{analytics.answerRate.toFixed(1)}%</div>
+              <div className="text-sm text-gray-300">Answer Rate</div>
+            </div>
+            <div className="bg-gray-700 p-4 rounded-lg">
+              <div className="text-2xl font-bold text-purple-400">{analytics.conversionRate.toFixed(1)}%</div>
+              <div className="text-sm text-gray-300">Conversion Rate</div>
               </div>
             </div>
 
-            {/* Additional Metrics */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
-                <div className="flex items-center">
-                  <Clock className="h-5 w-5 text-yellow-400 mr-2" />
-                  <span className="text-gray-300 text-sm">Avg Duration</span>
-                </div>
-                <p className="text-2xl font-bold text-white">{Math.floor(analytics.averageCallDuration / 60)}m {analytics.averageCallDuration % 60}s</p>
-              </div>
-              
-              <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
-                <div className="flex items-center">
-                  <BarChart3 className="h-5 w-5 text-indigo-400 mr-2" />
-                  <span className="text-gray-300 text-sm">Success Rate</span>
-                </div>
-                <p className="text-2xl font-bold text-white">{analytics.successRate.toFixed(1)}%</p>
-              </div>
-              
-              <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
-                <div className="flex items-center">
-                  <UserPlus className="h-5 w-5 text-teal-400 mr-2" />
-                  <span className="text-gray-300 text-sm">Leads Generated</span>
-                </div>
-                <p className="text-2xl font-bold text-white">{analytics.leadsGenerated}</p>
-              </div>
-              
-              <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
-                <div className="flex items-center">
-                  <PhoneCall className="h-5 w-5 text-pink-400 mr-2" />
-                  <span className="text-gray-300 text-sm">Callbacks</span>
-                </div>
-                <p className="text-2xl font-bold text-white">{analytics.callbackRequests}</p>
-              </div>
-            </div>
-
-            {/* Timeline Chart */}
-            <div className="bg-gray-800 p-4 rounded-lg border border-gray-700 mb-6">
-              <h3 className="text-lg font-semibold text-white mb-4">Call Timeline (Last 7 Days)</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-gray-700 p-4 rounded-lg">
+              <h4 className="text-lg font-semibold text-white mb-4">Call Timeline (Last 7 Days)</h4>
               <div className="space-y-2">
                 {analytics.callTimeline.map((day, index) => (
                   <div key={index} className="flex items-center justify-between">
@@ -374,25 +321,18 @@ export default function CampaignManager() {
               </div>
             </div>
 
-            {/* Top Performing Leads */}
-            <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
-              <h3 className="text-lg font-semibold text-white mb-4">Top Performing Leads</h3>
+            <div className="bg-gray-700 p-4 rounded-lg">
+              <h4 className="text-lg font-semibold text-white mb-4">Top Performing Leads</h4>
               <div className="space-y-2">
-                {analytics.topPerformingLeads.map((lead, index) => (
-                  <div key={index} className="flex items-center justify-between p-2 bg-gray-700 rounded">
+                {analytics.topPerformingLeads.slice(0, 5).map((lead, index) => (
+                  <div key={index} className="flex items-center justify-between p-2 bg-gray-600 rounded">
                     <div>
-                      <p className="text-white font-medium">{lead.name}</p>
-                      <p className="text-gray-400 text-sm">{lead.phone}</p>
+                      <div className="text-white font-medium">{lead.name}</div>
+                      <div className="text-gray-300 text-sm">{lead.phone}</div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <span className={`px-2 py-1 rounded text-xs ${
-                        lead.interest === 'high' ? 'bg-green-100 text-green-800' :
-                        lead.interest === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
-                        {lead.interest} interest
-                      </span>
-                      <span className="text-gray-400 text-sm">{lead.duration}s</span>
+                    <div className="text-right">
+                      <div className="text-green-400 text-sm">{lead.interest}</div>
+                      <div className="text-gray-300 text-xs">{lead.duration}s</div>
                     </div>
                   </div>
                 ))}
@@ -407,49 +347,52 @@ export default function CampaignManager() {
   const renderTemplates = () => {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-gray-900 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-          <div className="flex items-center justify-between p-6 border-b border-gray-700">
-            <div className="flex items-center">
-              <FileText className="h-6 w-6 text-blue-400 mr-3" />
-              <h2 className="text-xl font-bold text-white">Campaign Templates</h2>
-            </div>
+        <div className="bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-semibold text-white">Campaign Templates</h3>
             <button
               onClick={() => setShowTemplates(false)}
               className="text-gray-400 hover:text-white"
             >
-              ×
+              ✕
             </button>
           </div>
 
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {templates.map((template) => (
                 <div
                   key={template.id}
-                  className={`bg-gray-800 p-4 rounded-lg border cursor-pointer transition-colors ${
+                className={`p-4 border rounded-lg cursor-pointer transition-colors ${
                     selectedTemplate?.id === template.id 
                       ? 'border-blue-500 bg-blue-900 bg-opacity-20' 
-                      : 'border-gray-700 hover:border-blue-500'
+                    : 'border-gray-600 hover:border-gray-500'
                   }`}
                   onClick={() => handleTemplateSelect(template)}
                 >
-                  <h3 className="font-medium text-white mb-2">{template.name}</h3>
-                  <p className="text-gray-400 text-sm mb-3">{template.description}</p>
-                  <span className={`inline-block px-2 py-1 rounded-full text-xs ${
-                    template.category === 'lead-followup' ? 'bg-blue-100 text-blue-800' :
-                    template.category === 'property-showing' ? 'bg-green-100 text-green-800' :
-                    template.category === 'general' ? 'bg-purple-100 text-purple-800' :
-                    'bg-gray-100 text-gray-800'
-                  }`}>
-                    {template.category}
+                <h4 className="font-medium text-white mb-2">{template.name}</h4>
+                <p className="text-sm text-gray-300 mb-3">{template.description}</p>
+                <div className="flex flex-wrap gap-1">
+                  {template.variables.slice(0, 3).map((variable) => (
+                    <span
+                      key={variable}
+                      className="px-2 py-1 text-xs bg-gray-600 text-gray-300 rounded"
+                    >
+                      {variable}
+                    </span>
+                  ))}
+                  {template.variables.length > 3 && (
+                    <span className="px-2 py-1 text-xs bg-gray-600 text-gray-300 rounded">
+                      +{template.variables.length - 3} more
                   </span>
+                  )}
+                </div>
                 </div>
               ))}
             </div>
 
             {selectedTemplate && (
-              <div className="mt-6 bg-gray-800 p-4 rounded-lg border border-gray-700">
-                <h3 className="text-lg font-semibold text-white mb-4">Template Preview</h3>
+            <div className="mt-6 bg-gray-700 p-4 rounded-lg border border-gray-600">
+              <h4 className="text-lg font-semibold text-white mb-4">Template Preview</h4>
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">Variables</label>
@@ -461,7 +404,7 @@ export default function CampaignManager() {
                             type="text"
                             value={templateVariables[variable] || ''}
                             onChange={(e) => setTemplateVariables(prev => ({ ...prev, [variable]: e.target.value }))}
-                            className="px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm"
+                          className="px-2 py-1 bg-gray-600 border border-gray-500 rounded text-white text-sm"
                           />
                         </div>
                       ))}
@@ -470,7 +413,7 @@ export default function CampaignManager() {
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">Processed Prompt</label>
-                    <div className="bg-gray-700 p-3 rounded border border-gray-600">
+                  <div className="bg-gray-600 p-3 rounded border border-gray-500">
                       <p className="text-white text-sm">
                         {vapiService.processCampaignTemplate(selectedTemplate.id, templateVariables)}
                       </p>
@@ -479,7 +422,6 @@ export default function CampaignManager() {
                 </div>
               </div>
             )}
-          </div>
         </div>
       </div>
     );
@@ -507,6 +449,8 @@ export default function CampaignManager() {
           </button>
         </div>
       </div>
+
+
 
       {campaigns.length === 0 ? (
         <div className="text-center py-8">
@@ -541,25 +485,17 @@ export default function CampaignManager() {
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                <div>
-                  <p className="text-xs text-gray-400">Leads</p>
-                  <p className="font-medium text-white">{campaign.leadsCount}</p>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-white">{campaign.leadsCount}</div>
+                  <div className="text-sm text-gray-400">Leads</div>
                 </div>
-                <div>
-                  <p className="text-xs text-gray-400">Completion</p>
-                  <p className="font-medium text-white">{campaign.completionRate.toFixed(1)}%</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-400">ID</p>
-                  <p className="font-medium text-xs font-mono text-white">{campaign.id.slice(0, 8)}...</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-400">Status</p>
-                  <p className="font-medium capitalize text-white">{campaign.status}</p>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-400">{campaign.completionRate}%</div>
+                  <div className="text-sm text-gray-400">Completion</div>
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-wrap gap-2">
                 {canPause(campaign.status) && (
                   <button
                     onClick={() => handleCampaignAction(campaign.id, 'pause')}

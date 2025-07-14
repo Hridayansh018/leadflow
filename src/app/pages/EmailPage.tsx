@@ -54,7 +54,7 @@ export default function EmailPage({ onNavigate, currentRoute }: EmailPageProps) 
   // Move fetchSentEmails outside useEffect so it can be called by the refresh button
   const fetchSentEmails = useCallback(async () => {
     try {
-      const result = await emailDataService.getEmails({ typeDetail: 'sent' });
+      const result = await emailDataService.getEmails({ status: 'delivered' });
       const dbEmails = result.emails;
       // Build a set of unique keys for deduplication
       const existingKeys = new Set(
@@ -62,18 +62,18 @@ export default function EmailPage({ onNavigate, currentRoute }: EmailPageProps) 
       );
       const addedKeys = new Set<string>();
       dbEmails.forEach((dbEmail: StoredEmail) => {
-        const key = `${dbEmail.subject}|${dbEmail.to}|${new Date(dbEmail.timestamp).toLocaleString()}`;
+        const key = `${dbEmail.subject}|${dbEmail.to}|${new Date(dbEmail.created_at || '').toLocaleString()}`;
         if (!existingKeys.has(key) && !addedKeys.has(key)) {
           addEmail({
             from: dbEmail.from || 'admin@realestate.com',
             to: dbEmail.to,
             subject: dbEmail.subject,
             body: dbEmail.body,
-            timestamp: new Date(dbEmail.timestamp).toLocaleString(),
+            timestamp: new Date(dbEmail.created_at || '').toLocaleString(),
             type: 'sent',
-            read: dbEmail.read ?? true,
-            starred: dbEmail.starred ?? false,
-            archived: dbEmail.archived ?? false
+            read: true,
+            starred: false,
+            archived: false
           });
           addedKeys.add(key);
         }
@@ -83,8 +83,44 @@ export default function EmailPage({ onNavigate, currentRoute }: EmailPageProps) 
     }
   }, [addEmail, emails]);
 
+  // Fetch received emails
+  const fetchReceivedEmails = useCallback(async () => {
+    try {
+      const response = await fetch('/api/emails/received');
+      const result = await response.json();
+      
+      if (result.emails) {
+        const existingKeys = new Set(
+          emails.map(e => `${e.subject}|${e.from}|${e.timestamp}`)
+        );
+        const addedKeys = new Set<string>();
+        
+        result.emails.forEach((receivedEmail: any) => {
+          const key = `${receivedEmail.subject}|${receivedEmail.from}|${receivedEmail.timestamp}`;
+          if (!existingKeys.has(key) && !addedKeys.has(key)) {
+            addEmail({
+              from: receivedEmail.from,
+              to: receivedEmail.to,
+              subject: receivedEmail.subject,
+              body: receivedEmail.body,
+              timestamp: new Date(receivedEmail.timestamp).toLocaleString(),
+              type: 'received',
+              read: receivedEmail.read,
+              starred: receivedEmail.starred,
+              archived: receivedEmail.archived
+            });
+            addedKeys.add(key);
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load received emails:', error);
+    }
+  }, [addEmail, emails]);
+
   useEffect(() => {
     fetchSentEmails();
+    fetchReceivedEmails();
     // Only run on mount
   }, []);
 
@@ -96,7 +132,15 @@ export default function EmailPage({ onNavigate, currentRoute }: EmailPageProps) 
                            email.to.toLowerCase().includes(filters.search.toLowerCase()) ||
                            email.body.toLowerCase().includes(filters.search.toLowerCase());
       
-      const matchesType = email.type === 'sent';
+      // Filter by email type based on current route
+      let matchesType = true;
+      if (currentRoute === 'email-sent') {
+        matchesType = email.type === 'sent';
+      } else if (currentRoute === 'email-received') {
+        matchesType = email.type === 'received';
+      }
+      // For 'email' route, show all emails
+      
       const matchesStatus = filters.status === 'all' || 
                            (filters.status === 'starred' && email.starred) ||
                            (filters.status === 'archived' && email.archived);
@@ -111,7 +155,7 @@ export default function EmailPage({ onNavigate, currentRoute }: EmailPageProps) 
 
     // Sort by date (newest first)
     return filtered.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  }, [emails, filters]);
+  }, [emails, filters, currentRoute]);
 
   const isToday = (date: Date) => {
     const today = new Date();
@@ -310,6 +354,20 @@ export default function EmailPage({ onNavigate, currentRoute }: EmailPageProps) 
                 </span>
               </button>
               <button
+                onClick={() => onNavigate('email-received')}
+                className={`w-full flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  currentRoute === 'email-received'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-300 hover:bg-gray-700'
+                }`}
+              >
+                <Inbox className="h-4 w-4 mr-2" />
+                Received
+                <span className="ml-auto text-xs bg-gray-600 px-2 py-1 rounded-full">
+                  {emails.filter(e => e.type === 'received').length}
+                </span>
+              </button>
+              <button
                 onClick={() => onNavigate('email-starred')}
                 className={`w-full flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                   currentRoute === 'email-starred'
@@ -466,6 +524,7 @@ export default function EmailPage({ onNavigate, currentRoute }: EmailPageProps) 
                     <h2 className="text-xl font-bold text-white flex items-center">
                       <Mail className="h-5 w-5 mr-2" />
                       {currentRoute === 'email-sent' ? 'Sent Emails' : 
+                       currentRoute === 'email-received' ? 'Received Emails' :
                        currentRoute === 'email-starred' ? 'Starred Emails' : 'All Emails'} ({filteredEmails().length})
                     </h2>
                     <div className="flex items-center gap-2">

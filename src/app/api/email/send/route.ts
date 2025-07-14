@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
-import { MongoClient, ObjectId } from 'mongodb';
-
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/outreach';
-const DB_NAME = 'outreach';
+import { supabaseAdmin } from '../../../../services/supabase';
 
 interface EmailRecipient {
   name: string;
@@ -14,6 +11,10 @@ interface EmailContent {
   subject: string;
   htmlBody: string;
   textBody?: string;
+}
+
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, '');
 }
 
 export async function POST(request: NextRequest) {
@@ -76,7 +77,7 @@ export async function POST(request: NextRequest) {
     };
 
     // Send email
-    const defaultFromName = process.env.EMAIL_FROM_NAME || 'AI Call Pro CRM';
+    const defaultFromName = process.env.EMAIL_FROM_NAME || 'LeadFlow CRM';
     const from = fromName ? `${fromName} <${email}>` : `${defaultFromName} <${email}>`;
 
     const mailOptions = {
@@ -90,27 +91,25 @@ export async function POST(request: NextRequest) {
 
     await transporter.sendMail(mailOptions);
 
-    // Store sent email in outreach.storage
-    const client = new MongoClient(MONGODB_URI);
-    await client.connect();
-    const db = client.db(DB_NAME);
-    const storage = db.collection('storage');
-    await storage.insertOne({
-      userId: userId ? new ObjectId(userId) : null,
-      type: 'email',
+    // Store sent email in Supabase
+    const emailRecord = {
+      user_id: userId || null,
       from: fromName || email,
       to: recipient.email,
       subject: emailContent.subject,
       body: emailContent.htmlBody,
-      timestamp: new Date(),
-      typeDetail: 'sent',
       status: 'delivered',
-      read: true,
-      starred: false,
-      archived: false,
-      recipientName: recipient.name
-    });
-    await client.close();
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    const { error: dbError } = await supabaseAdmin
+      .from('emails')
+      .insert(emailRecord);
+
+    if (dbError) {
+      console.error('Error storing email record:', dbError);
+    }
 
     return NextResponse.json({
       success: true,
@@ -123,27 +122,20 @@ export async function POST(request: NextRequest) {
     // Store failed email record
     if (recipient && emailContent) {
       try {
-        const client = new MongoClient(MONGODB_URI);
-        await client.connect();
-        const db = client.db(DB_NAME);
-        const storage = db.collection('storage');
-        await storage.insertOne({
-          userId: userId ? new ObjectId(userId) : null,
-          type: 'email',
+        const emailRecord = {
+          user_id: userId || null,
           from: fromName || process.env.GMAIL_EMAIL,
           to: recipient.email,
           subject: emailContent.subject,
           body: emailContent.htmlBody,
-          timestamp: new Date(),
-          typeDetail: 'sent',
           status: 'failed',
-          read: true,
-          starred: false,
-          archived: false,
-          recipientName: recipient.name,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        });
-        await client.close();
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+
+        await supabaseAdmin
+          .from('emails')
+          .insert(emailRecord);
       } catch (dbError) {
         console.error('Error storing failed email record:', dbError);
       }
@@ -158,8 +150,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-function stripHtml(html: string): string {
-  return html.replace(/<[^>]*>/g, '');
 } 

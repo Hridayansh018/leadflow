@@ -10,7 +10,7 @@ import EmailPage from './pages/EmailPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 
-type Route = 'landing' | 'login' | 'dashboard' | 'analytics' | 'leads' | 'email' | 'email-sent' | 'email-received';
+type Route = 'landing' | 'login' | 'dashboard' | 'analytics' | 'leads' | 'email' | 'email-sent' | 'email-received' | 'email-starred' | 'email-archived';
 
 function AppContent() {
   const [currentRoute, setCurrentRoute] = useState<Route>('landing');
@@ -41,6 +41,8 @@ function AppContent() {
       case 'email':
       case 'email-sent':
       case 'email-received':
+      case 'email-starred':
+      case 'email-archived':
         return <EmailPage onNavigate={navigate} currentRoute={currentRoute} subRoute={emailSubRoute} />;
       default:
         return <LandingPage onNavigate={navigate} />;

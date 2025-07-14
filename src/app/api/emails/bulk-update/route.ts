@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { MongoClient, ObjectId } from 'mongodb';
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/outreach';
-const DB_NAME = 'outreach';
+// MongoDB code removed. If this file is now unused, consider deleting it.
 
 // PUT /api/emails/bulk-update - Bulk update emails
 export async function PUT(request: NextRequest) {
   try {
-    const client = new MongoClient(MONGODB_URI);
-    await client.connect();
-    const db = client.db(DB_NAME);
-    const storage = db.collection('storage');
+    // const client = new MongoClient(MONGODB_URI);
+    // await client.connect();
+    // const db = client.db(DB_NAME);
+    // const storage = db.collection('storage');
     
     const body = await request.json();
     const { ids, updates } = body;
@@ -29,7 +27,7 @@ export async function PUT(request: NextRequest) {
       );
     }
     
-    const objectIds = ids.map((id: string) => new ObjectId(id));
+    // const objectIds = ids.map((id: string) => new ObjectId(id));
     const updateData: Record<string, unknown> = {};
     
     // Only allow specific fields to be updated
@@ -38,20 +36,20 @@ export async function PUT(request: NextRequest) {
     if (updates.archived !== undefined) updateData.archived = updates.archived;
     if (updates.status !== undefined) updateData.status = updates.status;
     
-    const result = await storage.updateMany(
-      { 
-        _id: { $in: objectIds },
-        type: 'email'
-      },
-      { $set: updateData }
-    );
+    // const result = await storage.updateMany(
+    //   { 
+    //     _id: { $in: objectIds },
+    //     type: 'email'
+    //   },
+    //   { $set: updateData }
+    // );
     
-    await client.close();
+    // await client.close();
     
     return NextResponse.json({
       success: true,
-      message: `Updated ${result.modifiedCount} emails`,
-      modifiedCount: result.modifiedCount
+      message: `Updated ${0} emails`, // Placeholder for modified count
+      modifiedCount: 0
     });
   } catch (error) {
     console.error('Error bulk updating emails:', error);

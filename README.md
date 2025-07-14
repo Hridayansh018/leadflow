@@ -1,49 +1,25 @@
-# LeadFlow - AI-Powered Real Estate CRM
+# LeadFlow CRM
 
-LeadFlow is a comprehensive real estate CRM system that combines AI-powered calling, lead management, email automation, and advanced analytics to streamline real estate operations.
+A comprehensive real estate CRM system built with Next.js, featuring AI-powered calling, email management, and lead tracking.
 
 ## 🚀 Features
 
-### 🤖 AI-Powered Calling
-- **VAPI Integration**: Automated calling using VAPI's AI assistant
-- **Campaign Management**: Create and manage calling campaigns with custom prompts
-- **Call History**: Track and analyze all call interactions
-- **Smart Lead Targeting**: Intelligent lead prioritization and calling strategies
+- **Lead Management**: Track and manage real estate leads with detailed information
+- **AI Calling**: Automated phone calls using VAPI (Voice AI Platform)
+- **Email Campaigns**: Bulk email sending with templates and tracking
+- **Call History**: Monitor and analyze call performance
+- **Analytics Dashboard**: Comprehensive insights and reporting
+- **User Authentication**: Secure login with Supabase Auth
+- **Real-time Updates**: Live data synchronization
 
-### 📧 Email Automation
-- **Bulk Email Sending**: Send personalized emails to multiple leads simultaneously
-- **Email Templates**: Create and manage reusable email templates
-- **Gmail SMTP Integration**: Seamless email delivery through Gmail
-- **Email History**: Track all sent emails with delivery status
-- **Lead-Specific Emails**: Send targeted emails to individual leads
+## 🛠️ Tech Stack
 
-### 👥 Lead Management
-- **Lead Database**: Comprehensive lead storage and management
-- **Lead Analytics**: Track lead engagement and conversion rates
-- **Property File Management**: Upload and manage property files for campaigns
-- **Lead Scoring**: Intelligent lead prioritization based on interactions
-
-### 📊 Advanced Analytics
-- **Real-time Dashboard**: Live metrics and performance indicators
-- **Campaign Analytics**: Track campaign performance and success rates
-- **Call Analytics**: Analyze call patterns and outcomes
-- **Email Analytics**: Monitor email engagement and delivery rates
-- **Timeline Views**: Visual representation of lead interactions over time
-
-### 🎯 Campaign Management
-- **Campaign Creation**: Set up automated calling campaigns
-- **Pause/Resume**: Control campaign execution in real-time
-- **Progress Tracking**: Monitor campaign completion rates
-- **Success Metrics**: Track campaign effectiveness and ROI
-
-## 🛠️ Technology Stack
-
-- **Frontend**: Next.js 15, React, TypeScript
-- **Styling**: Tailwind CSS
-- **Database**: MongoDB (server-side), localStorage (client-side)
+- **Frontend**: Next.js 15, React 19, TypeScript
+- **Database**: Supabase (PostgreSQL)
+- **Authentication**: Supabase Auth
 - **AI Calling**: VAPI (Voice AI Platform)
 - **Email**: Gmail SMTP
-- **Authentication**: Custom auth system
+- **Styling**: Tailwind CSS
 - **Icons**: Lucide React
 
 ## 📋 Prerequisites
@@ -51,7 +27,7 @@ LeadFlow is a comprehensive real estate CRM system that combines AI-powered call
 Before running LeadFlow, ensure you have:
 
 - Node.js 18+ installed
-- MongoDB database (for production)
+- Supabase account and project
 - VAPI account and API credentials
 - Gmail account with app password for email sending
 
@@ -60,7 +36,7 @@ Before running LeadFlow, ensure you have:
 ### 1. Clone the Repository
 ```bash
 git clone <repository-url>
-cd real-estate-crm-nextjs
+cd leadflow
 ```
 
 ### 2. Install Dependencies
@@ -72,23 +48,37 @@ npm install
 Create a `.env.local` file in the root directory with the following variables:
 
 ```env
+# Supabase Configuration
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url_here
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key_here
+
 # VAPI Configuration
-NEXT_PUBLIC_VAPI_PRIVATE_KEY=your_vapi_private_key
-NEXT_PUBLIC_VAPI_ASSISTANT_ID=your_vapi_assistant_id
-NEXT_PUBLIC_PHONE_NUMBER_ID=your_phone_number_id
+NEXT_PUBLIC_VAPI_PRIVATE_KEY=your_vapi_private_key_here
+NEXT_PUBLIC_VAPI_ASSISTANT_ID=your_vapi_assistant_id_here
+NEXT_PUBLIC_PHONE_NUMBER_ID=your_vapi_phone_number_id_here
 
 # Email Configuration
-GMAIL_EMAIL=your_gmail_address
-GMAIL_APP_PASSWORD=your_gmail_app_password
+GMAIL_EMAIL=your_gmail_address@gmail.com
+GMAIL_APP_PASSWORD=your_gmail_app_password_here
 
-# Database (for production)
-MONGODB_URI=your_mongodb_connection_string
+# Application Configuration
+NEXTAUTH_SECRET=your_nextauth_secret_here
+NEXTAUTH_URL=http://localhost:3000
 
-# Authentication
-AUTH_SECRET=your_auth_secret
+# Optional: Email Templates Configuration
+EMAIL_FROM_NAME=LeadFlow CRM
+EMAIL_REPLY_TO=support@leadflow.com
 ```
 
-### 4. Run the Development Server
+### 4. Set up Supabase Database
+
+1. Create a new Supabase project
+2. Run the database migration script to create tables
+3. Configure Row Level Security (RLS) policies
+4. Create a test user in Supabase Auth
+
+### 5. Run the Development Server
 ```bash
 npm run dev
 ```
@@ -113,72 +103,90 @@ src/
 ## 🔧 Key Components
 
 ### Services
+- **`supabase.ts`**: Supabase client configuration
 - **`vapiService.ts`**: Handles AI calling functionality
 - **`emailService.ts`**: Manages email sending and templates
-- **`databaseService.ts`**: Database operations and data management
 - **`leadService.ts`**: Lead management operations
+- **`emailDataService.ts`**: Email data management
 
-### Components
-- **`CallHistoryTable.tsx`**: Displays call history with filtering
-- **`CampaignHistoryTable.tsx`**: Shows campaign performance
-- **`BulkEmailComposer.tsx`**: Bulk email composition interface
-- **`CampaignManager.tsx`**: Campaign creation and management
+### Authentication
+- **Supabase Auth**: Secure user authentication
+- **AuthContext**: React context for auth state management
+- **LoginPage**: User login and registration
 
-## 🎨 Features in Detail
+### Database Schema
+- **users**: User accounts and profiles
+- **leads**: Lead information and status
+- **emails**: Email records and tracking
+- **campaigns**: Campaign management
+- **call_history**: Call logs and analytics
 
-### AI Calling System
-- Integrates with VAPI for automated phone calls
-- Supports custom prompts for different scenarios
-- Tracks call outcomes and customer responses
-- Provides detailed call analytics
+## 🚀 Getting Started
 
-### Email Automation
-- Bulk email sending to multiple leads
-- Template-based email composition
-- Gmail SMTP integration for reliable delivery
-- Email history and delivery tracking
+### 1. Supabase Setup
+1. Create a new Supabase project
+2. Get your project URL and API keys
+3. Run the database migration script
+4. Configure authentication settings
+
+### 2. VAPI Setup
+1. Create a VAPI account
+2. Set up your assistant and phone number
+3. Add your API credentials to environment variables
+
+### 3. Email Setup
+1. Enable 2FA on your Gmail account
+2. Generate an app password
+3. Add email credentials to environment variables
+
+### 4. Test the Application
+1. Start the development server
+2. Create a test user account
+3. Test lead management and email features
+
+## 📝 API Documentation
+
+### Authentication Endpoints
+- `POST /api/login` - User login (now handled by Supabase Auth)
 
 ### Lead Management
-- Comprehensive lead database
-- Lead scoring and prioritization
-- Property file management
-- Lead interaction history
+- `GET /api/leads` - Get all leads
+- `POST /api/leads` - Create a new lead
+- `GET /api/leads/[id]` - Get a specific lead
+- `PUT /api/leads/[id]` - Update a lead
+- `DELETE /api/leads/[id]` - Delete a lead
 
-### Analytics Dashboard
-- Real-time performance metrics
-- Campaign success tracking
-- Call and email analytics
-- Visual data representations
+### Email Management
+- `GET /api/emails` - Get all emails
+- `POST /api/emails` - Create email record
+- `POST /api/email/send` - Send individual email
+- `POST /api/email/bulk` - Send bulk emails
 
-## 🔒 Security Features
+## 🔒 Security
 
-- Client-side data storage with localStorage
-- Server-side MongoDB integration
-- Secure API key management
-- Authentication system for user access
+- **Row Level Security (RLS)**: Database-level security policies
+- **Supabase Auth**: Secure authentication and session management
+- **Environment Variables**: Secure credential management
+- **Input Validation**: Server-side validation for all inputs
 
 ## 🚀 Deployment
 
-### Build for Production
-```bash
-npm run build
-npm start
-```
+### Vercel Deployment
+1. Connect your repository to Vercel
+2. Add environment variables
+3. Deploy automatically on push
 
-### Environment Variables for Production
-Ensure all required environment variables are set in your production environment:
-- VAPI credentials
-- Gmail SMTP settings
-- MongoDB connection string
-- Authentication secrets
+### Database Migration
+1. Run migration scripts in Supabase SQL editor
+2. Configure RLS policies
+3. Set up authentication providers
 
 ## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+4. Submit a pull request
 
 ## 📄 License
 
@@ -188,9 +196,5 @@ This project is licensed under the MIT License.
 
 For support and questions:
 - Check the documentation
-- Review the code comments
 - Open an issue on GitHub
-
----
-
-**LeadFlow** - Transforming real estate lead management with AI-powered automation.
+- Contact the development team

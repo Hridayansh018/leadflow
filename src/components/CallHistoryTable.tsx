@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Phone, Clock, User, Calendar, Search, Users } from 'lucide-react';
+import { Phone, Clock, User, Calendar, Search, Users, Plus } from 'lucide-react';
 import vapiService from '../services/vapiService';
+import SingleCallModal from './SingleCallModal';
 
 interface VAPICallData {
   id: string;
@@ -31,6 +32,7 @@ export default function CallHistoryTable() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [sortBy, setSortBy] = useState<'createdAt' | 'customerName' | 'status' | 'duration'>('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [showSingleCallModal, setShowSingleCallModal] = useState(false);
 
   useEffect(() => {
     loadCalls();
@@ -152,6 +154,11 @@ export default function CallHistoryTable() {
     return new Date(dateString).toLocaleString();
   };
 
+  const handleCallInitiated = (callId: string) => {
+    // Refresh the call list after a new call is initiated
+    loadCalls();
+  };
+
   const stats = [
     { name: 'Total Calls', value: calls.length, color: 'bg-blue-500' },
     { name: 'Answered', value: calls.filter(c => c.status === 'answered').length, color: 'bg-green-500' },
@@ -174,12 +181,21 @@ export default function CallHistoryTable() {
     <div className="bg-white rounded-lg shadow-md p-6">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-gray-900">Call History</h3>
-        <button
-          onClick={loadCalls}
-          className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-        >
-          Refresh
-        </button>
+        <div className="flex space-x-2">
+          <button
+            onClick={() => setShowSingleCallModal(true)}
+            className="px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Make Call
+          </button>
+          <button
+            onClick={loadCalls}
+            className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -200,169 +216,148 @@ export default function CallHistoryTable() {
       </div>
 
       {/* Filters */}
-      <div className="mb-4 space-y-3">
-        <div className="flex flex-wrap gap-3">
-          {/* Search */}
-          <div className="flex-1 min-w-64">
-            <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search by name, phone, or notes..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-
-          {/* Status Filter */}
-          <div className="min-w-32">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">All Status</option>
-              <option value="answered">Answered</option>
-              <option value="unanswered">Unanswered</option>
-              <option value="busy">Busy</option>
-              <option value="failed">Failed</option>
-            </select>
-          </div>
-
-          {/* Type Filter */}
-          <div className="min-w-32">
-            <select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">All Types</option>
-              <option value="single">Single Calls</option>
-              <option value="campaign">Campaign Calls</option>
-            </select>
-          </div>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search calls..."
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="all">All Statuses</option>
+            <option value="answered">Answered</option>
+            <option value="unanswered">Unanswered</option>
+            <option value="busy">Busy</option>
+            <option value="failed">Failed</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="all">All Types</option>
+            <option value="single">Single Calls</option>
+            <option value="campaign">Campaign Calls</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as any)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="createdAt">Date</option>
+            <option value="customerName">Customer</option>
+            <option value="status">Status</option>
+            <option value="duration">Duration</option>
+          </select>
         </div>
       </div>
 
-      {/* Results Count */}
-      <div className="mb-4 text-sm text-gray-600">
-        Showing {filteredCalls.length} of {calls.length} calls
-      </div>
-
-      {/* Table */}
+      {/* Call History Table */}
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50">
+        <table className="w-full text-sm text-left text-gray-500">
+          <thead className="text-xs text-gray-700 uppercase bg-gray-50">
             <tr>
-              <th className="px-4 py-3 text-left font-medium text-gray-700 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('createdAt')}>
-                <div className="flex items-center gap-1">
-                  <Calendar size={14} />
-                  Date/Time
-                  {sortBy === 'createdAt' && (
-                    <span className="text-xs">{sortOrder === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </div>
-              </th>
-              <th className="px-4 py-3 text-left font-medium text-gray-700 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('customerName')}>
-                <div className="flex items-center gap-1">
-                  <User size={14} />
+              <th className="px-6 py-3 cursor-pointer" onClick={() => handleSort('customerName')}>
+                <div className="flex items-center">
                   Customer
                   {sortBy === 'customerName' && (
-                    <span className="text-xs">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                    <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
                   )}
                 </div>
               </th>
-              <th className="px-4 py-3 text-left font-medium text-gray-700">Phone</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-700 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('status')}>
-                <div className="flex items-center gap-1">
+              <th className="px-6 py-3 cursor-pointer" onClick={() => handleSort('status')}>
+                <div className="flex items-center">
                   Status
                   {sortBy === 'status' && (
-                    <span className="text-xs">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                    <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
                   )}
                 </div>
               </th>
-              <th className="px-4 py-3 text-left font-medium text-gray-700 cursor-pointer hover:bg-gray-100" onClick={() => handleSort('duration')}>
-                <div className="flex items-center gap-1">
-                  <Clock size={14} />
+              <th className="px-6 py-3">Type</th>
+              <th className="px-6 py-3 cursor-pointer" onClick={() => handleSort('createdAt')}>
+                <div className="flex items-center">
+                  Date
+                  {sortBy === 'createdAt' && (
+                    <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                  )}
+                </div>
+              </th>
+              <th className="px-6 py-3 cursor-pointer" onClick={() => handleSort('duration')}>
+                <div className="flex items-center">
                   Duration
                   {sortBy === 'duration' && (
-                    <span className="text-xs">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                    <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
                   )}
                 </div>
               </th>
-              <th className="px-4 py-3 text-left font-medium text-gray-700">Type</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-700">Campaign</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-700">Interest</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-700">Notes</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
-            {filteredCalls.length === 0 ? (
-              <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
-                  No calls found matching your criteria
-                </td>
-              </tr>
-            ) : (
-              filteredCalls.map((call) => {
-                const callType = call.metadata?.campaignId ? 'campaign' : 'single';
-                const notes = (call.metadata as any)?.notes || '';
-                const interest = (call.metadata as any)?.interest || '';
-                const campaignName = (call.metadata as any)?.campaignName || '';
-                
-                return (
-                  <tr key={call.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-gray-900">
-                      {formatDate(call.createdAt)}
-                    </td>
-                    <td className="px-4 py-3 font-medium text-gray-900">
-                      {call.customer?.name || 'Unknown'}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">
-                      {call.customer?.number || '-'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(call.status)}`}>
-                        {call.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">
-                      {formatDuration('0:00')}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1 text-gray-600">
-                        {getTypeIcon(callType)}
-                        <span className="capitalize">{callType}</span>
+          <tbody>
+            {filteredCalls.map((call) => {
+              const callType = call.metadata?.campaignId ? 'campaign' : 'single';
+              return (
+                <tr key={call.id} className="bg-white border-b hover:bg-gray-50">
+                  <td className="px-6 py-4">
+                    <div>
+                      <div className="font-medium text-gray-900">
+                        {call.customer?.name || 'Unknown'}
                       </div>
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">
-                      {campaignName || '-'}
-                    </td>
-                    <td className="px-4 py-3">
-                      {interest ? (
-                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                          interest === 'high' ? 'bg-green-100 text-green-800' :
-                          interest === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {interest}
-                        </span>
-                      ) : (
-                        '-'
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600 max-w-xs truncate" title={notes}>
-                      {notes || '-'}
-                    </td>
-                  </tr>
-                );
-              })
-            )}
+                      <div className="text-gray-500">{call.customer?.number}</div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(call.status)}`}>
+                      {call.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center">
+                      {getTypeIcon(callType)}
+                      <span className="ml-1 capitalize">{callType}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-gray-500">
+                    {formatDate(call.createdAt)}
+                  </td>
+                  <td className="px-6 py-4 text-gray-500">
+                    {formatDuration((call.metadata as any)?.duration || '0:00')}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
+
+      {filteredCalls.length === 0 && (
+        <div className="text-center py-8 text-gray-500">
+          <Phone className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+          <p>No calls found matching your criteria</p>
+        </div>
+      )}
+
+      {/* Single Call Modal */}
+      <SingleCallModal
+        isOpen={showSingleCallModal}
+        onClose={() => setShowSingleCallModal(false)}
+        onCallInitiated={handleCallInitiated}
+      />
     </div>
   );
 } 

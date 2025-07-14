@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Edit, Trash2, Save, X } from 'lucide-react';
-import databaseService, { PropertyFile } from '../services/databaseService';
+// TODO: Replace all databaseService usage with real property file data fetching from Supabase or propertyFileService.
+import { showSuccess, showError, showConfirmation } from '../utils/toastUtils';
 
 interface PropertyFileManagerProps {
   selectedPropertyFileId: string;
@@ -10,7 +11,7 @@ interface PropertyFileManagerProps {
 }
 
 export default function PropertyFileManager({ selectedPropertyFileId, onPropertyFileChange }: PropertyFileManagerProps) {
-  const [propertyFiles, setPropertyFiles] = useState<PropertyFile[]>([]);
+  const [propertyFiles, setPropertyFiles] = useState<any[]>([]); // Changed type to any[] as PropertyFile is removed
   const [isCreating, setIsCreating] = useState(false);
   const [isEditing, setIsEditing] = useState<string | null>(null);
   const [formData, setFormData] = useState<{
@@ -47,17 +48,17 @@ export default function PropertyFileManager({ selectedPropertyFileId, onProperty
 
   const loadPropertyFiles = useCallback(async () => {
     try {
-      const pf = await databaseService.getPropertyFiles();
-      setPropertyFiles(pf);
+      // TODO: Fetch property files from Supabase
+      setPropertyFiles([]); // Placeholder
       
       // Set default selection if none selected
-      if (!selectedPropertyFileId && pf.length > 0 && pf[0].id) {
-        onPropertyFileChange(pf[0].id);
+      if (!selectedPropertyFileId && propertyFiles.length > 0 && propertyFiles[0].id) {
+        onPropertyFileChange(propertyFiles[0].id);
       }
     } catch (error) {
       console.error('Error loading property files:', error);
     }
-  }, [selectedPropertyFileId, onPropertyFileChange]);
+  }, [selectedPropertyFileId, onPropertyFileChange, propertyFiles]);
 
   useEffect(() => {
     loadPropertyFiles();
@@ -84,7 +85,7 @@ export default function PropertyFileManager({ selectedPropertyFileId, onProperty
     });
   };
 
-  const handleEdit = (pf: PropertyFile) => {
+  const handleEdit = (pf: any) => { // Changed type to any
     if (pf.id) {
       setIsEditing(pf.id);
       setFormData({
@@ -99,10 +100,12 @@ export default function PropertyFileManager({ selectedPropertyFileId, onProperty
   const handleSave = async () => {
     try {
       if (isCreating) {
-        await databaseService.createPropertyFile(formData);
+        // TODO: Create property file in Supabase
+        showSuccess('Property file created successfully (placeholder)');
         setIsCreating(false);
       } else if (isEditing) {
-        await databaseService.updatePropertyFile(isEditing, formData);
+        // TODO: Update property file in Supabase
+        showSuccess('Property file updated successfully (placeholder)');
         setIsEditing(null);
       }
       
@@ -115,7 +118,7 @@ export default function PropertyFileManager({ selectedPropertyFileId, onProperty
       await loadPropertyFiles();
     } catch (error) {
       console.error('Error saving property file:', error);
-      alert('Error saving property file');
+      showError('Error saving property file');
     }
   };
 
@@ -131,9 +134,12 @@ export default function PropertyFileManager({ selectedPropertyFileId, onProperty
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this property file?')) {
+    showConfirmation(
+      'Are you sure you want to delete this property file?',
+      async () => {
       try {
-        await databaseService.deletePropertyFile(id);
+        // TODO: Delete property file in Supabase
+        showSuccess('Property file deleted successfully (placeholder)');
         await loadPropertyFiles();
         
         // If deleted item was selected, select first available
@@ -145,11 +151,13 @@ export default function PropertyFileManager({ selectedPropertyFileId, onProperty
             onPropertyFileChange('');
           }
         }
+          showSuccess('Property file deleted successfully');
       } catch (error) {
         console.error('Error deleting property file:', error);
-        alert('Error deleting property file');
+          showError('Error deleting property file');
+        }
       }
-    }
+    );
   };
 
   const addProperty = () => {

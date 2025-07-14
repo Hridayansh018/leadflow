@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Plus, Play } from 'lucide-react';
+import { Plus, Play, Upload, FileText, Users, X } from 'lucide-react';
 import vapiService from '../services/vapiService';
+import csvUploadService, { CSVLead } from '../services/csvUploadService';
+import { showSuccess, showError, showWarning } from '../utils/toastUtils';
 
 interface CampaignTemplate {
   id: string;
@@ -19,6 +21,8 @@ interface Lead {
   email: string;
   phone: string;
   status: string;
+  location?: string;
+  notes?: string;
 }
 
 export default function CampaignCreator() {
@@ -26,51 +30,15 @@ export default function CampaignCreator() {
   const [campaignName, setCampaignName] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<CampaignTemplate | null>(null);
   const [customPrompt, setCustomPrompt] = useState('');
-  const [templateVariables, setTemplateVariables] = useState<Record<string, string>>({});
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
-  const [leads, setLeads] = useState<Lead[]>([]);
+  const [csvLeads, setCsvLeads] = useState<CSVLead[]>([]);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [templates] = useState<CampaignTemplate[]>(vapiService.getCampaignTemplates());
-
-  // Load leads when component mounts
-  React.useEffect(() => {
-    loadLeads();
-  }, []);
 
   const handleTemplateSelect = (template: CampaignTemplate) => {
     setSelectedTemplate(template);
     setCustomPrompt(''); // Clear custom prompt when template is selected
-    
-    // Set default variables
-    const defaultVars: Record<string, string> = {
-      recipientName: 'John Doe',
-      senderName: 'AI Call Pro',
-      companyName: 'AI Call Pro CRM',
-      propertyType: 'residential',
-      location: 'Downtown',
-      propertyAddress: '123 Main St',
-      showingDate: new Date().toLocaleDateString(),
-      showingTime: '2:00 PM',
-      propertyFeatures: '3 bedrooms, 2 bathrooms',
-      propertyPrice: '$500,000',
-      marketConditions: 'favorable',
-      marketTrend: 'increasing prices',
-      inquiryType: 'property inquiry',
-      specificDetails: '3-bedroom homes',
-      openHouseDate: new Date().toLocaleDateString(),
-      openHouseTime: '1:00 PM - 4:00 PM',
-      propertyHighlights: 'recently renovated, great location'
-    };
-    
-    // Only set variables that exist in the template
-    const templateVars: Record<string, string> = {};
-    template.variables.forEach(variable => {
-      if (defaultVars[variable]) {
-        templateVars[variable] = defaultVars[variable];
-      }
-    });
-    
-    setTemplateVariables(templateVars);
   };
 
   const handleCustomPromptChange = () => {
@@ -79,23 +47,41 @@ export default function CampaignCreator() {
 
   const getFinalPrompt = (): string => {
     if (selectedTemplate) {
-      return vapiService.processCampaignTemplate(selectedTemplate.id, templateVariables);
+      return selectedTemplate.prompt;
     }
     return customPrompt;
   };
 
-  const loadLeads = async () => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.csv')) {
+      showError('Please upload a CSV file');
+      return;
+    }
+
     try {
       setLoading(true);
-      // This would load leads from your database
-      const mockLeads: Lead[] = [
-        { id: '1', name: 'John Smith', email: 'john@example.com', phone: '+1234567890', status: 'new' },
-        { id: '2', name: 'Jane Doe', email: 'jane@example.com', phone: '+1234567891', status: 'contacted' },
-        { id: '3', name: 'Bob Johnson', email: 'bob@example.com', phone: '+1234567892', status: 'interested' },
-      ];
-      setLeads(mockLeads);
+      setUploadedFile(file);
+      
+      // Parse CSV file
+      const leads = await csvUploadService.parseCSVFile(file);
+      
+      if (leads.length === 0) {
+        showError('No valid leads found in CSV file');
+        return;
+      }
+
+      // Store in database
+      await csvUploadService.storeUploadedCSV(file.name, leads);
+      
+      setCsvLeads(leads);
+      showSuccess(`Successfully uploaded ${leads.length} leads from CSV`);
     } catch (error) {
-      console.error('Error loading leads:', error);
+      console.error('Error uploading CSV:', error);
+      showError(`Error uploading CSV: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setUploadedFile(null);
     } finally {
       setLoading(false);
     }
@@ -110,26 +96,32 @@ export default function CampaignCreator() {
   };
 
   const handleSelectAllLeads = () => {
-    setSelectedLeads(leads.map(lead => lead.id));
+    setSelectedLeads(csvLeads.map(lead => lead.id));
   };
 
   const handleDeselectAllLeads = () => {
     setSelectedLeads([]);
   };
 
+  const clearUploadedData = () => {
+    setUploadedFile(null);
+    setCsvLeads([]);
+    setSelectedLeads([]);
+  };
+
   const createCampaign = async () => {
     if (!campaignName.trim()) {
-      alert('Please enter a campaign name');
+      showWarning('Please enter a campaign name');
       return;
     }
 
     if (!getFinalPrompt().trim()) {
-      alert('Please enter a campaign prompt or select a template');
+      showWarning('Please enter a campaign prompt or select a template');
       return;
     }
 
     if (selectedLeads.length === 0) {
-      alert('Please select at least one lead');
+      showWarning('Please select at least one lead');
       return;
     }
 
@@ -150,7 +142,7 @@ export default function CampaignCreator() {
         phoneNumberId: process.env.NEXT_PUBLIC_PHONE_NUMBER_ID || '',
         prompt: campaignData.prompt,
         leads: campaignData.leads.map(leadId => {
-          const lead = leads.find(l => l.id === leadId);
+          const lead = csvLeads.find(l => l.id === leadId);
           return {
             name: lead?.name || 'Unknown',
             phone: lead?.phone || '',
@@ -159,17 +151,17 @@ export default function CampaignCreator() {
         })
       });
       
-      alert('✅ Campaign created successfully!');
+      showSuccess('Campaign created successfully!');
       setShowCreator(false);
       // Reset form
       setCampaignName('');
       setSelectedTemplate(null);
       setCustomPrompt('');
-      setTemplateVariables({});
       setSelectedLeads([]);
+      clearUploadedData();
     } catch (error) {
       console.error('Error creating campaign:', error);
-      alert(`❌ Error creating campaign: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      showError(`Error creating campaign: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -247,27 +239,7 @@ export default function CampaignCreator() {
                 </div>
               </div>
 
-              {/* Template Variables */}
-              {selectedTemplate && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Template Variables
-                  </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {selectedTemplate.variables.map((variable) => (
-                      <div key={variable}>
-                        <label className="block text-xs text-gray-400 mb-1">{variable}</label>
-                        <input
-                          type="text"
-                          value={templateVariables[variable] || ''}
-                          onChange={(e) => setTemplateVariables(prev => ({ ...prev, [variable]: e.target.value }))}
-                          className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+
 
               {/* Custom Prompt */}
               <div>
@@ -320,8 +292,66 @@ export default function CampaignCreator() {
                   </div>
                 </div>
                 
+                {/* CSV Upload Section */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Upload CSV File *
+                  </label>
+                  <div className="border-2 border-dashed border-gray-600 rounded-lg p-4 text-center">
+                    <input
+                      type="file"
+                      accept=".csv"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                      id="csv-upload"
+                    />
+                    <label htmlFor="csv-upload" className="cursor-pointer">
+                      <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                      <p className="text-gray-300">Click to upload CSV file</p>
+                      <p className="text-gray-500 text-xs">Required columns: name, email, phone</p>
+                    </label>
+                  </div>
+                  {uploadedFile && (
+                    <div className="mt-2 flex items-center justify-between bg-gray-800 p-2 rounded">
+                      <div className="flex items-center">
+                        <FileText className="h-4 w-4 text-green-400 mr-2" />
+                        <span className="text-white text-sm">{uploadedFile.name}</span>
+                      </div>
+                      <button
+                        onClick={clearUploadedData}
+                        className="text-red-400 hover:text-red-300"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Lead Selection */}
+                {csvLeads.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-sm font-medium text-gray-300">
+                        Select Leads from CSV *
+                  </label>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={handleSelectAllLeads}
+                      className="text-xs text-blue-400 hover:text-blue-300"
+                    >
+                      Select All
+                    </button>
+                    <button
+                      onClick={handleDeselectAllLeads}
+                      className="text-xs text-gray-400 hover:text-gray-300"
+                    >
+                      Deselect All
+                    </button>
+                  </div>
+                </div>
+                
                 <div className="max-h-40 overflow-y-auto bg-gray-800 rounded border border-gray-700">
-                  {leads.map((lead) => (
+                      {csvLeads.map((lead) => (
                     <div
                       key={lead.id}
                       className={`flex items-center p-2 hover:bg-gray-700 cursor-pointer ${
@@ -337,21 +367,19 @@ export default function CampaignCreator() {
                       />
                       <div className="flex-1">
                         <p className="text-white text-sm font-medium">{lead.name}</p>
-                        <p className="text-gray-400 text-xs">{lead.phone}</p>
+                            <p className="text-gray-400 text-xs">{lead.email} • {lead.phone}</p>
+                            {lead.location && (
+                              <p className="text-gray-500 text-xs">{lead.location}</p>
+                            )}
                       </div>
-                      <span className={`px-2 py-1 rounded text-xs ${
-                        lead.status === 'new' ? 'bg-blue-100 text-blue-800' :
-                        lead.status === 'contacted' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-green-100 text-green-800'
-                      }`}>
-                        {lead.status}
-                      </span>
                     </div>
                   ))}
                 </div>
                 <p className="text-xs text-gray-400 mt-1">
-                  Selected {selectedLeads.length} of {leads.length} leads
+                      Selected {selectedLeads.length} of {csvLeads.length} leads
                 </p>
+                  </div>
+                )}
               </div>
 
               {/* Action Buttons */}

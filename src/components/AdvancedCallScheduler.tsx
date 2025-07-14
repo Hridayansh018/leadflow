@@ -15,7 +15,8 @@ import {
   AlertTriangle,
   XCircle
 } from 'lucide-react';
-// import vapiService from '../services/vapiService'; // Commented out - not used
+import vapiService from '../services/vapiService';
+import { showSuccess, showError, showWarning } from '../utils/toastUtils';
 
 interface RecurringSchedule {
   id: string;
@@ -71,35 +72,12 @@ export default function AdvancedCallScheduler() {
   const loadRecurringSchedules = async () => {
     try {
       setLoading(true);
-      // Mock data - in real app, this would come from your database
-      const mockSchedules: RecurringSchedule[] = [
-        {
-          id: '1',
-          name: 'Daily Follow-up',
-          frequency: 'daily',
-          time: '14:00',
-          timezone: 'America/New_York',
-          isActive: true,
-          totalCalls: 45,
-          successfulCalls: 32,
-          nextRun: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-        },
-        {
-          id: '2',
-          name: 'Weekly Market Update',
-          frequency: 'weekly',
-          time: '10:00',
-          daysOfWeek: [1], // Monday
-          timezone: 'America/New_York',
-          isActive: true,
-          totalCalls: 12,
-          successfulCalls: 8,
-          nextRun: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-        }
-      ];
-      setRecurringSchedules(mockSchedules);
+      // Load real schedules from VAPI or database
+      // For now, we'll start with empty array and let users create real schedules
+      setRecurringSchedules([]);
     } catch (error) {
       console.error('Error loading recurring schedules:', error);
+      showError('Failed to load recurring schedules');
     } finally {
       setLoading(false);
     }
@@ -108,32 +86,12 @@ export default function AdvancedCallScheduler() {
   const loadCallQueue = async () => {
     try {
       setLoading(true);
-      // Mock data - in real app, this would come from your database
-      const mockQueue: CallQueue[] = [
-        {
-          id: '1',
-          customerName: 'John Smith',
-          phoneNumber: '+1234567890',
-          scheduledTime: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
-          status: 'pending',
-          priority: 'high',
-          retryCount: 0,
-          maxRetries: 3
-        },
-        {
-          id: '2',
-          customerName: 'Jane Doe',
-          phoneNumber: '+1234567891',
-          scheduledTime: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
-          status: 'pending',
-          priority: 'medium',
-          retryCount: 1,
-          maxRetries: 3
-        }
-      ];
-      setCallQueue(mockQueue);
+      // Load real call queue from VAPI or database
+      // For now, we'll start with empty array and let users create real queue items
+      setCallQueue([]);
     } catch (error) {
       console.error('Error loading call queue:', error);
+      showError('Failed to load call queue');
     } finally {
       setLoading(false);
     }
@@ -169,10 +127,10 @@ export default function AdvancedCallScheduler() {
         isActive: true
       });
       
-      alert('✅ Recurring schedule created successfully!');
+      showSuccess('Recurring schedule created successfully!');
     } catch (error) {
       console.error('Error creating schedule:', error);
-      alert('❌ Error creating schedule');
+      showError('Error creating schedule');
     } finally {
       setLoading(false);
     }

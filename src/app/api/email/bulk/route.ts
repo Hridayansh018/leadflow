@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
-import { MongoClient, ObjectId } from 'mongodb';
-
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/outreach';
-const DB_NAME = 'outreach';
+import { supabaseAdmin } from '../../../../services/supabase';
 
 interface EmailRecipient {
   name: string;
@@ -16,34 +13,37 @@ interface EmailContent {
   textBody?: string;
 }
 
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, '');
+}
+
 export async function POST(request: NextRequest) {
+  let emailRecipients: EmailRecipient[] = [];
+  let emailContent: EmailContent | undefined;
+  let fromName: string | undefined;
+  let userId: string | undefined;
+  
   try {
     const body = await request.json();
-    const { recipients, content, fromName, userId } = body;
+    const { recipients, content, fromName: bodyFromName, userId: bodyUserId } = body;
+    emailRecipients = recipients;
+    emailContent = content;
+    fromName = bodyFromName;
+    userId = bodyUserId;
 
     // Validate required fields
-    if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
+    if (!emailRecipients || !Array.isArray(emailRecipients) || emailRecipients.length === 0) {
       return NextResponse.json(
         { error: 'Missing or invalid recipients array' },
         { status: 400 }
       );
     }
 
-    if (!content || !content.subject || !content.htmlBody) {
+    if (!emailContent || !emailContent.subject || !emailContent.htmlBody) {
       return NextResponse.json(
         { error: 'Missing required content fields: subject, htmlBody' },
         { status: 400 }
       );
-    }
-
-    // Validate each recipient
-    for (const recipient of recipients) {
-      if (!recipient.name || !recipient.email) {
-        return NextResponse.json(
-          { error: 'Each recipient must have name and email fields' },
-          { status: 400 }
-        );
-      }
     }
 
     // Check email configuration
@@ -74,43 +74,17 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    const emailRecipients: EmailRecipient[] = recipients.map((r: { name: string; email: string }) => ({
-      name: r.name,
-      email: r.email
-    }));
+    const defaultFromName = process.env.EMAIL_FROM_NAME || 'LeadFlow CRM';
+    const from = fromName ? `${fromName} <${email}>` : `${defaultFromName} <${email}>`;
 
-    const emailContent: EmailContent = {
-      subject: content.subject,
-      htmlBody: content.htmlBody,
-      textBody: content.textBody
-    };
-
-    // Send bulk emails and track results
-    const failedRecipients: string[] = [];
     let successCount = 0;
-    const defaultFromName = process.env.EMAIL_FROM_NAME || 'AI Call Pro CRM';
-    const emailRecords: Array<{
-      userId: ObjectId | null;
-      type: string;
-      from: string;
-      to: string;
-      subject: string;
-      body: string;
-      timestamp: Date;
-      typeDetail: string;
-      status: string;
-      read: boolean;
-      starred: boolean;
-      archived: boolean;
-      recipientName: string;
-      error?: string;
-    }> = [];
-    const now = new Date();
+    const failedRecipients: string[] = [];
+    const emailRecords: any[] = [];
+    const now = new Date().toISOString();
 
+    // Send emails to each recipient
     for (const recipient of emailRecipients) {
       try {
-        const from = fromName ? `${fromName} <${email}>` : `${defaultFromName} <${email}>`;
-
         const mailOptions = {
           from,
           to: `${recipient.name} <${recipient.email}>`,
@@ -122,42 +96,31 @@ export async function POST(request: NextRequest) {
 
         await transporter.sendMail(mailOptions);
         successCount++;
-        
+
         // Add successful email record
         emailRecords.push({
-          userId: userId ? new ObjectId(userId) : null,
-          type: 'email',
+          user_id: userId || null,
           from: fromName || email,
           to: recipient.email,
           subject: emailContent.subject,
           body: emailContent.htmlBody,
-          timestamp: now,
-          typeDetail: 'sent',
           status: 'delivered',
-          read: true,
-          starred: false,
-          archived: false,
-          recipientName: recipient.name
+          created_at: now,
+          updated_at: now
         });
       } catch (error) {
         failedRecipients.push(`${recipient.name} (${recipient.email})`);
         
         // Add failed email record
         emailRecords.push({
-          userId: userId ? new ObjectId(userId) : null,
-          type: 'email',
+          user_id: userId || null,
           from: fromName || email,
           to: recipient.email,
           subject: emailContent.subject,
           body: emailContent.htmlBody,
-          timestamp: now,
-          typeDetail: 'sent',
           status: 'failed',
-          read: true,
-          starred: false,
-          archived: false,
-          recipientName: recipient.name,
-          error: error instanceof Error ? error.message : 'Unknown error'
+          created_at: now,
+          updated_at: now
         });
       }
     }
@@ -165,14 +128,15 @@ export async function POST(request: NextRequest) {
     const totalRecipients = emailRecipients.length;
     const successRate = totalRecipients > 0 ? (successCount / totalRecipients) * 100 : 0;
 
-    // Store all email records in database
+    // Store all email records in Supabase
     if (emailRecords.length > 0) {
-      const client = new MongoClient(MONGODB_URI);
-      await client.connect();
-      const db = client.db(DB_NAME);
-      const storage = db.collection('storage');
-      await storage.insertMany(emailRecords);
-      await client.close();
+      const { error: dbError } = await supabaseAdmin
+        .from('emails')
+        .insert(emailRecords);
+
+      if (dbError) {
+        console.error('Error storing email records:', dbError);
+      }
     }
 
     return NextResponse.json({
@@ -194,8 +158,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-function stripHtml(html: string): string {
-  return html.replace(/<[^>]*>/g, '');
 } 

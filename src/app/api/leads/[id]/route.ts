@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import databaseService from '../../../../services/databaseService';
+import { supabaseAdmin } from '../../../../services/supabase';
 
 // GET /api/leads/[id] - Get a single lead
 export async function GET(
@@ -9,10 +9,13 @@ export async function GET(
   try {
     const { id } = await params;
     
-    const leads = await databaseService.getRecords('lead', { id });
-    const lead = leads.find(l => l.id === id);
-    
-    if (!lead) {
+    const { data: lead, error } = await supabaseAdmin
+      .from('leads')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error || !lead) {
       return NextResponse.json(
         { error: 'Lead not found' },
         { status: 404 }
@@ -37,16 +40,24 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    
-    const lead = await databaseService.updateRecord('lead', id, {
+
+    const updateData = {
       ...body,
-      updatedAt: new Date()
-    });
-    
-    if (!lead) {
+      updated_at: new Date().toISOString()
+    };
+
+    const { data: lead, error } = await supabaseAdmin
+      .from('leads')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating lead:', error);
       return NextResponse.json(
-        { error: 'Lead not found' },
-        { status: 404 }
+        { error: 'Failed to update lead' },
+        { status: 500 }
       );
     }
 
@@ -67,17 +78,21 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    
-    const success = await databaseService.deleteRecord('lead', id);
-    
-    if (!success) {
+
+    const { error } = await supabaseAdmin
+      .from('leads')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting lead:', error);
       return NextResponse.json(
-        { error: 'Lead not found' },
-        { status: 404 }
+        { error: 'Failed to delete lead' },
+        { status: 500 }
       );
     }
 
-    return NextResponse.json({ message: 'Lead deleted successfully' });
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting lead:', error);
     return NextResponse.json(

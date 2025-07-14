@@ -1,57 +1,54 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { MongoClient, ObjectId } from 'mongodb';
-
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/outreach';
-const DB_NAME = 'outreach';
+import { supabaseAdmin } from '../../../services/supabase';
 
 // GET /api/emails - Get all stored emails
 export async function GET(request: NextRequest) {
   try {
-    const client = new MongoClient(MONGODB_URI);
-    await client.connect();
-    const db = client.db(DB_NAME);
-    const storage = db.collection('storage');
-    
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
-    const type = searchParams.get('type') || 'email';
     const status = searchParams.get('status'); // sent, received, etc.
     const userId = searchParams.get('userId');
     const search = searchParams.get('search');
     
-    const skip = (page - 1) * limit;
+    const offset = (page - 1) * limit;
     
-    // Build filter object
-    const filter: Record<string, unknown> = { type };
-    if (status) filter.typeDetail = status;
-    if (userId) filter.userId = new ObjectId(userId);
+    // Build query
+    let query = supabaseAdmin
+      .from('emails')
+      .select('*', { count: 'exact' });
+
+    if (status) {
+      query = query.eq('status', status);
+    }
+    if (userId) {
+      query = query.eq('user_id', userId);
+    }
     if (search) {
-      filter.$or = [
-        { subject: { $regex: search, $options: 'i' } },
-        { from: { $regex: search, $options: 'i' } },
-        { to: { $regex: search, $options: 'i' } },
-        { body: { $regex: search, $options: 'i' } }
-      ];
+      query = query.or(`subject.ilike.%${search}%,from.ilike.%${search}%,to.ilike.%${search}%`);
     }
     
-    const emails = await storage.find(filter)
-      .sort({ timestamp: -1 })
-      .skip(skip)
-      .limit(limit)
-      .toArray();
+    // Add pagination and ordering
+    query = query.range(offset, offset + limit - 1);
+    query = query.order('created_at', { ascending: false });
     
-    const total = await storage.countDocuments(filter);
+    const { data: emails, error, count } = await query;
     
-    await client.close();
+    if (error) {
+      console.error('Error fetching emails:', error);
+      return NextResponse.json(
+        { error: 'Failed to fetch emails' },
+        { status: 500 }
+      );
+    }
     
     return NextResponse.json({
-      emails,
+      emails: emails || [],
       pagination: {
         page,
         limit,
-        total,
-        pages: Math.ceil(total / limit)
+        total: count || 0,
+        pages: Math.ceil((count || 0) / limit)
       }
     });
   } catch (error) {
@@ -66,13 +63,8 @@ export async function GET(request: NextRequest) {
 // POST /api/emails - Create a new email record (for manual entry)
 export async function POST(request: NextRequest) {
   try {
-    const client = new MongoClient(MONGODB_URI);
-    await client.connect();
-    const db = client.db(DB_NAME);
-    const storage = db.collection('storage');
-    
     const body = await request.json();
-    const { from, to, subject, body: emailBody, typeDetail = 'sent', userId } = body;
+    const { from, to, subject, body: emailBody, status = 'sent', user_id } = body;
     
     // Validate required fields
     if (!from || !to || !subject || !emailBody) {
@@ -83,26 +75,34 @@ export async function POST(request: NextRequest) {
     }
     
     const emailRecord = {
-      userId: userId ? new ObjectId(userId) : null,
-      type: 'email',
+      user_id: user_id || null,
       from,
       to,
       subject,
       body: emailBody,
-      timestamp: new Date(),
-      typeDetail,
-      read: typeDetail === 'sent',
-      starred: false,
-      archived: false
+      status,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     };
     
-    const result = await storage.insertOne(emailRecord);
-    await client.close();
+    const { data, error } = await supabaseAdmin
+      .from('emails')
+      .insert(emailRecord)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error creating email record:', error);
+      return NextResponse.json(
+        { error: 'Failed to create email record' },
+        { status: 500 }
+      );
+    }
     
     return NextResponse.json({
       success: true,
       message: 'Email record created successfully',
-      emailId: result.insertedId
+      emailId: data.id
     }, { status: 201 });
   } catch (error) {
     console.error('Error creating email record:', error);

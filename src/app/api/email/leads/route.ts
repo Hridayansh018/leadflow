@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import emailService, { EmailContent } from '../../../../services/emailService';
-import { MongoClient, ObjectId } from 'mongodb';
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/outreach';
-const DB_NAME = 'outreach';
+// MongoDB code removed. If this file is now unused, consider deleting it.
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,25 +33,8 @@ export async function POST(request: NextRequest) {
 
     if (result.success && Array.isArray(leads)) {
       // Store each sent email to leads in outreach.storage
-      const client = new MongoClient(MONGODB_URI);
-      await client.connect();
-      const db = client.db(DB_NAME);
-      const storage = db.collection('storage');
-      const now = new Date();
-      await storage.insertMany(leads.map((to: Record<string, unknown>) => ({
-        userId: userId ? new ObjectId(userId) : null,
-        type: 'email',
-        from: fromName || process.env.GMAIL_EMAIL,
-        to: to.email,
-        subject: content.subject,
-        body: content.htmlBody,
-        timestamp: now,
-        typeDetail: 'sent',
-        read: true,
-        starred: false,
-        archived: false
-      })));
-      await client.close();
+      // The original code had MongoDB logic here, which is removed.
+      // If this file is now unused, consider deleting it.
       return NextResponse.json(result);
     } else {
       return NextResponse.json(result, { status: 500 });

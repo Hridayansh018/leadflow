@@ -14,6 +14,7 @@ import {
   Filter
 } from 'lucide-react';
 import emailService from '../services/emailService';
+import { showSuccess, showError } from '../utils/toastUtils';
 
 interface EmailTemplate {
   id: string;
@@ -61,45 +62,11 @@ export default function EmailTemplateManager() {
   const loadTemplates = async () => {
     try {
       setLoading(true);
-      // Mock data - in real app, this would come from your database
-      const mockTemplates: EmailTemplate[] = [
-        {
-          id: '1',
-          name: 'Lead Follow-up',
-          subject: 'Thank you for your interest',
-          content: 'Hi {{recipientName}},\n\nThank you for your interest in our properties. We have some great options that match your criteria.\n\nBest regards,\n{{senderName}}',
-          category: 'lead-followup',
-          variables: ['recipientName', 'senderName'],
-          isDefault: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        },
-        {
-          id: '2',
-          name: 'Property Showing Invitation',
-          subject: 'Property showing invitation',
-          content: 'Hi {{recipientName}},\n\nYou\'re invited to view {{propertyAddress}} on {{showingDate}} at {{showingTime}}.\n\nBest regards,\n{{senderName}}',
-          category: 'property-showing',
-          variables: ['recipientName', 'propertyAddress', 'showingDate', 'showingTime', 'senderName'],
-          isDefault: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        },
-        {
-          id: '3',
-          name: 'Market Update',
-          subject: 'Market update for {{location}}',
-          content: 'Hi {{recipientName}},\n\nHere\'s your market update for {{location}}. {{marketUpdate}}.\n\nBest regards,\n{{senderName}}',
-          category: 'market-update',
-          variables: ['recipientName', 'location', 'marketUpdate', 'senderName'],
-          isDefault: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }
-      ];
-      setTemplates(mockTemplates);
+      // Start with empty templates - users will create their own
+      setTemplates([]);
     } catch (error) {
       console.error('Error loading templates:', error);
+      showError('Failed to load email templates');
     } finally {
       setLoading(false);
     }
@@ -107,27 +74,27 @@ export default function EmailTemplateManager() {
 
   const loadCategories = async () => {
     try {
-      const mockCategories: TemplateCategory[] = [
+      const categories: TemplateCategory[] = [
         {
           id: 'lead-followup',
           name: 'Lead Follow-up',
           description: 'Templates for following up with leads',
           color: 'blue',
-          templateCount: 1
+          templateCount: 0
         },
         {
           id: 'property-showing',
           name: 'Property Showing',
           description: 'Templates for property viewing invitations',
           color: 'green',
-          templateCount: 1
+          templateCount: 0
         },
         {
           id: 'market-update',
           name: 'Market Update',
           description: 'Templates for market updates and insights',
           color: 'purple',
-          templateCount: 1
+          templateCount: 0
         },
         {
           id: 'general',
@@ -144,9 +111,10 @@ export default function EmailTemplateManager() {
           templateCount: 0
         }
       ];
-      setCategories(mockCategories);
+      setCategories(categories);
     } catch (error) {
       console.error('Error loading categories:', error);
+      showError('Failed to load template categories');
     }
   };
 
@@ -176,10 +144,10 @@ export default function EmailTemplateManager() {
         variables: []
       });
       
-      alert('✅ Template created successfully!');
+      showSuccess('Template created successfully!');
     } catch (error) {
       console.error('Error creating template:', error);
-      alert('❌ Error creating template');
+      showError('Error creating template');
     } finally {
       setLoading(false);
     }
@@ -224,10 +192,10 @@ export default function EmailTemplateManager() {
         variables: []
       });
       
-      alert('✅ Template updated successfully!');
+      showSuccess('Template updated successfully!');
     } catch (error) {
       console.error('Error updating template:', error);
-      alert('❌ Error updating template');
+      showError('Error updating template');
     } finally {
       setLoading(false);
     }

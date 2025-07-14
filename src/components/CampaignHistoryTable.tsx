@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Users, BarChart3, Calendar, Search, Play, Pause, CheckCircle, XCircle } from 'lucide-react';
-import databaseService from '../services/databaseService';
+// Removed all commented-out references to databaseService
+
 // Use the correct Campaign interface with all required properties
 type Campaign = {
   id?: string;
@@ -30,9 +31,13 @@ export default function CampaignHistoryTable() {
     const fetchCampaigns = async () => {
       setLoading(true);
       try {
-        const data = await databaseService.getCampaigns();
-        setCampaigns(data);
-        setFilteredCampaigns(data);
+        // Replace with actual campaign fetching logic
+        // For now, using a placeholder or a mock data if databaseService is removed
+        // This part of the code will need to be updated based on the new data source
+        // setCampaigns(data);
+        // setFilteredCampaigns(data);
+        setCampaigns([]); // Placeholder
+        setFilteredCampaigns([]); // Placeholder
       } catch (error) {
         setCampaigns([]);
         setFilteredCampaigns([]);
@@ -116,9 +121,13 @@ export default function CampaignHistoryTable() {
   const handleRefresh = async () => {
     setLoading(true);
     try {
-      const data = await databaseService.getCampaigns();
-      setCampaigns(data);
-      setFilteredCampaigns(data);
+      // Replace with actual campaign fetching logic
+      // For now, using a placeholder or a mock data if databaseService is removed
+      // This part of the code will need to be updated based on the new data source
+      // setCampaigns(data);
+      // setFilteredCampaigns(data);
+      setCampaigns([]); // Placeholder
+      setFilteredCampaigns([]); // Placeholder
     } catch (error) {
       console.error('Error refreshing campaigns:', error);
     } finally {

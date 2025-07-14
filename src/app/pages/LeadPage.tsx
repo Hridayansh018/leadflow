@@ -5,6 +5,7 @@ import { Search, Edit, Trash2, Phone, Mail, Calendar } from 'lucide-react';
 import Header from '../../components/Header';
 import Footer from '../../components/Footer';
 import leadService, { Lead } from '../../services/leadService';
+import { showSuccess, showError } from '../../utils/toastUtils';
 
 interface LeadPageProps {
   onNavigate: (route: string) => void;
@@ -15,21 +16,19 @@ export default function LeadPage({ onNavigate }: LeadPageProps) {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [interestFilter, setInterestFilter] = useState('');
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<Partial<Lead>>({});
 
   useEffect(() => {
     loadLeads();
-  }, [statusFilter, interestFilter]);
+  }, [statusFilter]);
 
   const loadLeads = async () => {
     try {
       setLoading(true);
       const response = await leadService.getLeads({
-        status: statusFilter || undefined,
-        interest: interestFilter || undefined
+        status: statusFilter || undefined
       });
       setLeads(response.leads);
     } catch (error) {
@@ -46,17 +45,17 @@ export default function LeadPage({ onNavigate }: LeadPageProps) {
   };
 
   const handleSaveEdit = async () => {
-    if (!selectedLead?._id) return;
+    if (!selectedLead?.id) return;
     
     try {
-      await leadService.updateLead(selectedLead._id, editForm);
+      await leadService.updateLead(selectedLead.id, editForm);
       setIsEditing(false);
       setSelectedLead(null);
       setEditForm({});
       await loadLeads();
     } catch (error) {
       console.error('Error updating lead:', error);
-      alert('Error updating lead');
+        showError('Error updating lead');
     }
   };
 
@@ -68,15 +67,14 @@ export default function LeadPage({ onNavigate }: LeadPageProps) {
       await loadLeads();
     } catch (error) {
       console.error('Error deleting lead:', error);
-      alert('Error deleting lead');
+        showError('Error deleting lead');
     }
   };
 
   const filteredLeads = leads.filter(lead =>
     lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     lead.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    lead.phone.includes(searchTerm) ||
-    lead.property.toLowerCase().includes(searchTerm.toLowerCase())
+    lead.phone.includes(searchTerm)
   );
 
   const getStatusColor = (status: string) => {
@@ -86,15 +84,6 @@ export default function LeadPage({ onNavigate }: LeadPageProps) {
       case 'qualified': return 'bg-purple-100 text-purple-800';
       case 'converted': return 'bg-green-100 text-green-800';
       case 'lost': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getInterestColor = (interest: string) => {
-    switch (interest) {
-      case 'high': return 'bg-green-100 text-green-800';
-      case 'medium': return 'bg-yellow-100 text-yellow-800';
-      case 'low': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -115,7 +104,7 @@ export default function LeadPage({ onNavigate }: LeadPageProps) {
 
         {/* Search and Filters */}
         <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <input
@@ -138,17 +127,6 @@ export default function LeadPage({ onNavigate }: LeadPageProps) {
               <option value="qualified">Qualified</option>
               <option value="converted">Converted</option>
               <option value="lost">Lost</option>
-            </select>
-            
-            <select
-              value={interestFilter}
-              onChange={(e) => setInterestFilter(e.target.value)}
-              className="px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All Interest Levels</option>
-              <option value="high">High Interest</option>
-              <option value="medium">Medium Interest</option>
-              <option value="low">Low Interest</option>
             </select>
             
             <button
@@ -185,61 +163,52 @@ export default function LeadPage({ onNavigate }: LeadPageProps) {
                   <tr>
                     <th className="px-6 py-3">Name</th>
                     <th className="px-6 py-3">Contact</th>
-                    <th className="px-6 py-3">Property</th>
                     <th className="px-6 py-3">Status</th>
-                    <th className="px-6 py-3">Interest</th>
+                    <th className="px-6 py-3">Notes</th>
                     <th className="px-6 py-3">Created</th>
                     <th className="px-6 py-3">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredLeads.map((lead) => (
-                    <tr key={lead._id} className="bg-gray-800 border-b border-gray-700 hover:bg-gray-700">
+                    <tr key={lead.id} className="bg-gray-800 border-b border-gray-700 hover:bg-gray-700">
                       <td className="px-6 py-4 font-medium text-white">
                         {lead.name}
                       </td>
                       <td className="px-6 py-4">
                         <div className="space-y-1">
-                          <div className="flex items-center text-sm">
-                            <Mail className="h-3 w-3 mr-1" />
+                          <div className="flex items-center text-gray-300">
+                            <Mail className="h-4 w-4 mr-2" />
                             {lead.email}
                           </div>
-                          <div className="flex items-center text-sm">
-                            <Phone className="h-3 w-3 mr-1" />
+                          <div className="flex items-center text-gray-300">
+                            <Phone className="h-4 w-4 mr-2" />
                             {lead.phone}
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4">{lead.property}</td>
                       <td className="px-6 py-4">
-                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(lead.status)}`}>
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(lead.status)}`}>
                           {lead.status}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getInterestColor(lead.interest)}`}>
-                          {lead.interest}
-                        </span>
+                      <td className="px-6 py-4 text-gray-300">
+                        {lead.notes || '-'}
+                      </td>
+                      <td className="px-6 py-4 text-gray-300">
+                        {lead.created_at ? formatDate(lead.created_at) : '-'}
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center text-sm">
-                          <Calendar className="h-3 w-3 mr-1" />
-                          {lead.createdAt ? formatDate(lead.createdAt) : 'N/A'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center space-x-2">
+                        <div className="flex space-x-2">
                           <button
                             onClick={() => handleEditLead(lead)}
-                            className="p-1 text-blue-600 hover:text-blue-400"
-                            title="Edit"
+                            className="text-blue-400 hover:text-blue-300 transition-colors"
                           >
                             <Edit className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => handleDeleteLead(lead._id!)}
-                            className="p-1 text-red-600 hover:text-red-400"
-                            title="Delete"
+                            onClick={() => handleDeleteLead(lead.id!)}
+                            className="text-red-400 hover:text-red-300 transition-colors"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -252,50 +221,45 @@ export default function LeadPage({ onNavigate }: LeadPageProps) {
             </div>
           )}
         </div>
-      </main>
 
       {/* Edit Modal */}
       {isEditing && selectedLead && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
-            <h3 className="text-lg font-semibold text-white mb-4">Edit Lead</h3>
-            
+            <div className="bg-gray-800 p-6 rounded-lg w-full max-w-md">
+              <h3 className="text-xl font-semibold text-white mb-4">Edit Lead</h3>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">Name</label>
                 <input
                   type="text"
                   value={editForm.name || ''}
-                  onChange={(e) => setEditForm({...editForm, name: e.target.value})}
+                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white"
                 />
               </div>
-              
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">Email</label>
                 <input
                   type="email"
                   value={editForm.email || ''}
-                  onChange={(e) => setEditForm({...editForm, email: e.target.value})}
+                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white"
                 />
               </div>
-              
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">Phone</label>
                 <input
                   type="tel"
                   value={editForm.phone || ''}
-                  onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
+                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white"
                 />
               </div>
-              
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">Status</label>
                 <select
                   value={editForm.status || ''}
-                  onChange={(e) => setEditForm({...editForm, status: e.target.value as 'new' | 'contacted' | 'qualified' | 'converted' | 'lost'})}
+                    onChange={(e) => setEditForm({ ...editForm, status: e.target.value as any })}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white"
                 >
                   <option value="new">New</option>
@@ -305,48 +269,38 @@ export default function LeadPage({ onNavigate }: LeadPageProps) {
                   <option value="lost">Lost</option>
                 </select>
               </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Interest</label>
-                <select
-                  value={editForm.interest || ''}
-                  onChange={(e) => setEditForm({...editForm, interest: e.target.value as 'high' | 'medium' | 'low'})}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white"
-                >
-                  <option value="high">High</option>
-                  <option value="medium">Medium</option>
-                  <option value="low">Low</option>
-                </select>
-              </div>
-              
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">Notes</label>
                 <textarea
                   value={editForm.notes || ''}
-                  onChange={(e) => setEditForm({...editForm, notes: e.target.value})}
+                    onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white"
                   rows={3}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white"
                 />
               </div>
             </div>
-            
             <div className="flex justify-end space-x-3 mt-6">
               <button
-                onClick={() => setIsEditing(false)}
-                className="px-4 py-2 text-gray-300 hover:text-white"
+                  onClick={() => {
+                    setIsEditing(false);
+                    setSelectedLead(null);
+                    setEditForm({});
+                  }}
+                  className="px-4 py-2 text-gray-300 hover:text-white transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveEdit}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
               >
-                Save Changes
+                  Save
               </button>
             </div>
           </div>
         </div>
       )}
+      </main>
 
       <Footer />
     </div>

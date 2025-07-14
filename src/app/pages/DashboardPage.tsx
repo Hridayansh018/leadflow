@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Play, Upload, Plus, Trash2, Phone, Users, BarChart3, Calendar } from 'lucide-react';
+import { Play, Upload, Plus, Trash2, Phone, Users, BarChart3, Calendar, Pause, CheckCircle, Clock } from 'lucide-react';
 import Header from '../../components/Header';
 import Footer from '../../components/Footer';
 import { useData } from '../context/DataContext';
 import vapiService from '../../services/vapiService';
+import dashboardService, { DashboardMetrics } from '../../services/dashboardService';
+import { showSuccess, showError, showWarning, showInfo, showConfirmation } from '../../utils/toastUtils';
 
 import leadService from '../../services/leadService';
 import { timezones, getCurrentTimeInTimezone } from '../../utils/timezoneUtils';
@@ -14,11 +16,8 @@ import PropertyFileManager from '../../components/PropertyFileManager';
 import CallHistoryTable from '../../components/CallHistoryTable';
 import CampaignHistoryTable from '../../components/CampaignHistoryTable';
 
-import CampaignStatusChecker from '../../components/CampaignStatusChecker';
 import CampaignManager from '../../components/CampaignManager';
 import AdvancedAnalytics from '../../components/AdvancedAnalytics';
-
-
 
 interface DashboardPageProps {
   onNavigate: (route: string) => void;
@@ -44,7 +43,16 @@ export default function DashboardPage({ onNavigate }: DashboardPageProps) {
   
   // New state for property file selection
   const [selectedPropertyFileId, setSelectedPropertyFileId] = useState('');
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'calls' | 'campaigns'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'calls' | 'campaigns' | 'analytics'>('dashboard');
+  
+  // Campaign status filter
+  const [campaignStatusFilter, setCampaignStatusFilter] = useState<'all' | 'active' | 'paused' | 'completed'>('all');
+  const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null);
+  const [campaignCallHistory, setCampaignCallHistory] = useState<any[]>([]);
+
+  // Dashboard metrics state
+  const [dashboardMetrics, setDashboardMetrics] = useState<DashboardMetrics | null>(null);
+  const [loadingMetrics, setLoadingMetrics] = useState(false);
 
   // Check VAPI configuration status
   const vapiConfig = vapiService.getConfigurationStatus();
@@ -55,12 +63,12 @@ export default function DashboardPage({ onNavigate }: DashboardPageProps) {
     try {
       const result = await vapiService.testVAPIConnection();
       if (result.success) {
-        alert('✅ VAPI API connection successful!');
+        showSuccess('VAPI API connection successful!');
       } else {
-        alert(`❌ VAPI API connection failed: ${result.message}\n\nDetails: ${JSON.stringify(result.details, null, 2)}`);
+        showError(`VAPI API connection failed: ${result.message}`);
       }
     } catch (error) {
-      alert(`❌ Error testing VAPI connection: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      showError(`Error testing VAPI connection: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -70,7 +78,7 @@ export default function DashboardPage({ onNavigate }: DashboardPageProps) {
       // Get all campaigns first
       const campaigns = await vapiService.getCampaigns();
       if (campaigns.length === 0) {
-        alert('No campaigns found. Create a campaign first.');
+        showWarning('No campaigns found. Create a campaign first.');
         return;
       }
       
@@ -85,136 +93,115 @@ export default function DashboardPage({ onNavigate }: DashboardPageProps) {
           `- ${call.customerName} (${call.phoneNumber}): ${call.status}`
         ).join('\n')}`;
       
-      alert(message);
+      showInfo(message);
     } catch (error) {
       console.error('Campaign details error:', error);
-      alert(`❌ Error checking campaign details: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      showError(`Error checking campaign details: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
+  // Load campaign call history
+  const loadCampaignCallHistory = async (campaignId: string) => {
+    try {
+      const details = await vapiService.getCampaignDetails(campaignId);
+      setCampaignCallHistory(details.callStatuses);
+    } catch (error) {
+      console.error('Error loading campaign call history:', error);
+      setCampaignCallHistory([]);
+    }
+  };
 
-
+  // Handle campaign selection
+  const handleCampaignSelect = async (campaignId: string) => {
+    setSelectedCampaign(campaignId);
+    await loadCampaignCallHistory(campaignId);
+  };
 
   const handleCreateCampaign = async () => {
-    if (!campaignName.trim()) {
-      alert('Please enter a campaign name.');
+    if (!campaignName || !campaignPrompt) {
+      showWarning('Please enter both campaign name and prompt.');
       return;
     }
 
-
-
-    if (campaignSchedule === 'schedule') {
-      if (useTimeOfDay && !callTimeOfDay) {
-        alert('Please select a time of day for the campaign.');
-        return;
-      }
-      if (!useTimeOfDay && !campaignScheduledTime) {
-        alert('Please select a scheduled time for the campaign.');
-        return;
-      }
-    }
-
-    setIsCreatingCampaign(true);
-
     try {
-      // Get environment variables
-      const phoneNumberId = process.env.NEXT_PUBLIC_PHONE_NUMBER_ID;
-      const assistantId = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID;
-      
-      console.log('Creating campaign with configuration:', {
-        name: campaignName,
-        phoneNumberId,
-        assistantId,
-        hasPhoneNumberId: !!phoneNumberId,
-        hasAssistantId: !!assistantId,
-        schedule: campaignSchedule,
-        timeOfDay: useTimeOfDay ? callTimeOfDay : undefined,
-        scheduledTime: !useTimeOfDay ? campaignScheduledTime : undefined
-      });
-      
-      if (!phoneNumberId || !assistantId) {
-        alert('Missing VAPI configuration. Please check your environment variables.');
+      setIsCreatingCampaign(true);
+
+      // Get leads from leadService
+      let leads: any[] = [];
+      try {
+        const leadResponse = await leadService.getLeads();
+        leads = leadResponse.leads || [];
+      } catch (error) {
+        console.error('Error fetching leads:', error);
+        showError('Failed to fetch leads. Please try again.');
         return;
       }
 
-      // Create VAPI campaign with leads using native VAPI campaign API
-      const campaignResponse = await vapiService.createCampaign({
+      if (leads.length === 0) {
+        showWarning('No leads available. Please add some leads first.');
+        return;
+      }
+
+      // Create campaign request
+      const campaignRequest = {
         name: campaignName,
-        assistantId,
-        phoneNumberId,
-        leads: [],
-        prompt: campaignPrompt || 'Default campaign prompt for lead outreach',
-        ...(campaignSchedule === 'schedule' && {
-          ...(useTimeOfDay 
-            ? { timeOfDay: callTimeOfDay, timezone: timezone }
-            : { scheduledTime: campaignScheduledTime }
-          )
-        })
+        assistantId: process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID!,
+        phoneNumberId: process.env.NEXT_PUBLIC_PHONE_NUMBER_ID!,
+        leads: leads.map(lead => ({
+          name: lead.name,
+          phone: lead.phone,
+          info: lead.notes || ''
+        })),
+        prompt: campaignPrompt
+      };
+
+      let campaignResponse;
+
+      if (campaignSchedule === 'now') {
+        // Start campaign immediately
+        console.log('Starting campaign immediately...');
+        campaignResponse = await vapiService.createCampaign(campaignRequest);
+        showSuccess(`Campaign started successfully! Campaign ID: ${campaignResponse.id}`);
+      } else {
+        // Schedule the campaign - use createCampaign with scheduledTime
+        console.log('Scheduling campaign...');
+        campaignResponse = await vapiService.createCampaign({
+          ...campaignRequest,
+          scheduledTime: campaignScheduledTime
       });
+        showSuccess(`Campaign scheduled successfully! Campaign ID: ${campaignResponse.id}`);
+      }
 
-      console.log('Campaign created successfully:', campaignResponse);
-
-      // Add to local campaign list
+      // Add to local campaigns
       addCampaign({
         name: campaignName,
-        leads: 0,
         status: 'active',
-        createdAt: new Date().toISOString().split('T')[0]
+        leads: leads.length,
+        createdAt: new Date().toISOString()
       });
       
-      // Clear form
       setCampaignName('');
-
       setCampaignPrompt('');
       setCampaignScheduledTime('');
       setCampaignSchedule('now');
-      
-      alert(`Campaign "${campaignName}" created successfully!`);
     } catch (error) {
       console.error('Error creating campaign:', error);
-      alert(`Failed to create campaign: ${error instanceof Error ? error.message : 'Unknown error'}. Please check your VAPI configuration.`);
+      showError('Failed to create campaign. Please check your VAPI configuration.');
     } finally {
       setIsCreatingCampaign(false);
     }
   };
 
   const handleMakeCall = async () => {
-    if (customerName.trim() && customerPhone.trim()) {
+    if (customerName && customerPhone) {
       try {
-        // Get environment variables
-        const phoneNumberId = process.env.NEXT_PUBLIC_PHONE_NUMBER_ID;
-        const assistantId = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID;
-        
-        if (!phoneNumberId || !assistantId) {
-          alert('Missing VAPI configuration. Please check your environment variables.');
-          return;
-        }
-
-        if (callSchedule === 'schedule') {
-          if (useTimeOfDay) {
-            // For time-of-day scheduling, check if time is selected
-            if (!callTimeOfDay) {
-              alert('Please select a time of day.');
-              return;
-            }
-          } else {
-            // For specific date/time scheduling, check if scheduled time is selected
-            if (!scheduledTime) {
-              alert('Please select a scheduled time.');
-              return;
-            }
-          }
-        }
-
-        // Prepare call request
         const callRequest = {
-          phoneNumberId,
-          assistantId,
           customer: {
-            number: customerPhone,
             name: customerName,
-            info: customerInfo
+            number: customerPhone
           },
+          assistantId: process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID!,
+          phoneNumberId: process.env.NEXT_PUBLIC_PHONE_NUMBER_ID!,
           metadata: {
             customerInfo: customerInfo
           }
@@ -226,7 +213,7 @@ export default function DashboardPage({ onNavigate }: DashboardPageProps) {
           // Make immediate VAPI call
           console.log('Making immediate call...');
           callResponse = await vapiService.makeCall(callRequest);
-          alert(`Call initiated successfully! Call ID: ${callResponse.id}`);
+          showSuccess(`Call initiated successfully! Call ID: ${callResponse.id}`);
         } else {
           // Schedule the call
           console.log('Scheduling call...');
@@ -244,7 +231,7 @@ export default function DashboardPage({ onNavigate }: DashboardPageProps) {
               scheduledTime: scheduledTime
             });
           }
-          alert(`Call scheduled successfully! Call ID: ${callResponse.id}`);
+          showSuccess(`Call scheduled successfully! Call ID: ${callResponse.id}`);
         }
 
         // Add to local call history
@@ -268,10 +255,10 @@ export default function DashboardPage({ onNavigate }: DashboardPageProps) {
         setCallSchedule('now');
       } catch (error) {
         console.error('Error making call:', error);
-        alert('Failed to initiate call. Please check your VAPI configuration. Try "Call Now" first to test the basic connection.');
+        showError('Failed to initiate call. Please check your VAPI configuration. Try "Call Now" first to test the basic connection.');
       }
     } else {
-      alert('Please enter both customer name and phone number.');
+      showWarning('Please enter both customer name and phone number.');
     }
   };
 
@@ -290,9 +277,9 @@ export default function DashboardPage({ onNavigate }: DashboardPageProps) {
   const handleCancelScheduledCall = (id: string) => {
     if (vapiService.cancelScheduledCall(id)) {
       setScheduledCalls(prev => prev.filter(call => call.id !== id));
-      alert('Scheduled call cancelled successfully!');
+      showSuccess('Scheduled call cancelled successfully!');
     } else {
-      alert('Failed to cancel scheduled call.');
+      showError('Failed to cancel scheduled call.');
     }
   };
 
@@ -307,8 +294,8 @@ export default function DashboardPage({ onNavigate }: DashboardPageProps) {
   const [stats, setStats] = useState([
     { name: 'Total Campaigns', value: 0, icon: BarChart3, color: 'bg-blue-500' },
     { name: 'Active Campaigns', value: 0, icon: Play, color: 'bg-green-500' },
-    { name: 'Total Leads', value: 0, icon: Users, color: 'bg-purple-500' },
-    { name: 'This Month', value: 0, icon: Calendar, color: 'bg-orange-500' }
+    { name: 'Paused Campaigns', value: 0, icon: Pause, color: 'bg-yellow-500' },
+    { name: 'Completed Campaigns', value: 0, icon: CheckCircle, color: 'bg-purple-500' }
   ]);
   const [loadingStats, setLoadingStats] = useState(true);
 
@@ -344,30 +331,52 @@ export default function DashboardPage({ onNavigate }: DashboardPageProps) {
             color: 'bg-green-500'
           },
           {
-            name: 'Total Leads',
-            value: leads.length,
-            icon: Users,
-            color: 'bg-purple-500'
+            name: 'Paused Campaigns',
+            value: campaigns.filter(c => c.status === 'paused').length,
+            icon: Pause,
+            color: 'bg-yellow-500'
           },
           {
-            name: 'This Month',
-            value: campaigns.filter(c => (c.createdAt || '').startsWith(thisMonth)).length,
-            icon: Calendar,
-            color: 'bg-orange-500'
+            name: 'Completed Campaigns',
+            value: campaigns.filter(c => c.status === 'completed').length,
+            icon: CheckCircle,
+            color: 'bg-purple-500'
           }
         ]);
       } catch {
         setStats([
           { name: 'Total Campaigns', value: 0, icon: BarChart3, color: 'bg-blue-500' },
           { name: 'Active Campaigns', value: 0, icon: Play, color: 'bg-green-500' },
-          { name: 'Total Leads', value: 0, icon: Users, color: 'bg-purple-500' },
-          { name: 'This Month', value: 0, icon: Calendar, color: 'bg-orange-500' }
+          { name: 'Paused Campaigns', value: 0, icon: Pause, color: 'bg-yellow-500' },
+          { name: 'Completed Campaigns', value: 0, icon: CheckCircle, color: 'bg-purple-500' }
         ]);
       } finally {
         setLoadingStats(false);
       }
     };
     fetchStats();
+  }, []);
+
+  // Load dashboard metrics
+  const loadDashboardMetrics = async () => {
+    try {
+      setLoadingMetrics(true);
+      const metrics = await dashboardService.getDashboardMetrics();
+      setDashboardMetrics(metrics);
+    } catch (error) {
+      console.error('Error loading dashboard metrics:', error);
+    } finally {
+      setLoadingMetrics(false);
+    }
+  };
+
+  // Refresh dashboard data
+  const refreshDashboard = () => {
+    loadDashboardMetrics();
+  };
+
+  useEffect(() => {
+    loadDashboardMetrics();
   }, []);
 
   return (
@@ -404,6 +413,7 @@ export default function DashboardPage({ onNavigate }: DashboardPageProps) {
         {/* VAPI Configuration Status */}
         {!isVapiConfigured && (
           <div className="mb-8 bg-red-900 border border-red-700 rounded-lg p-4">
+            <div className="flex items-center justify-between">
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
@@ -412,15 +422,26 @@ export default function DashboardPage({ onNavigate }: DashboardPageProps) {
               </div>
               <div className="ml-3">
                 <h3 className="text-sm font-medium text-red-200">
-                  VAPI Configuration Required
+                    VAPI Not Configured
                 </h3>
                 <div className="mt-2 text-sm text-red-300">
                   <p>{vapiConfig.message}</p>
-                  <p className="mt-1">
-                    Please create a <code className="bg-red-800 px-1 rounded">.env</code> file with your VAPI credentials. 
-                    See the README for setup instructions.
-                  </p>
                 </div>
+                </div>
+              </div>
+              <div className="flex space-x-2">
+                <button
+                  onClick={testVAPIConnection}
+                  className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+                >
+                  Test Connection
+                </button>
+                <button
+                  onClick={checkCampaignDetails}
+                  className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
+                >
+                  Check Campaign Details
+                </button>
               </div>
             </div>
           </div>
@@ -462,18 +483,8 @@ export default function DashboardPage({ onNavigate }: DashboardPageProps) {
           </div>
         )}
 
-        {/* Campaign Management Section */}
-        {/* <div className="mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Campaign Management</h2>
-          <CampaignManager />
-        </div> */}
-
-
-
-
-
         {/* Tab Navigation */}
-        <div className="mb-6">
+        <div className="mb-6 flex items-center justify-between">
           <nav className="flex space-x-8">
             <button
               onClick={() => setActiveTab('dashboard')}
@@ -505,490 +516,340 @@ export default function DashboardPage({ onNavigate }: DashboardPageProps) {
             >
               Campaign History
             </button>
-
+            <button
+              onClick={() => setActiveTab('analytics')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'analytics'
+                  ? 'border-blue-500 text-blue-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+              }`}
+            >
+              Analytics
+            </button>
           </nav>
+          {activeTab === 'dashboard' && (
+            <button
+              onClick={refreshDashboard}
+              disabled={loadingMetrics}
+              className="bg-gray-600 hover:bg-gray-700 disabled:bg-gray-800 text-white px-3 py-2 rounded-md font-medium transition-colors flex items-center text-sm"
+            >
+              <svg className={`h-4 w-4 mr-2 ${loadingMetrics ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Refresh Data
+            </button>
+          )}
         </div>
 
         {/* Tab Content */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
-            {/* Property File Manager */}
-            {/* <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
-              <PropertyFileManager
-                selectedPropertyFileId={selectedPropertyFileId}
-                onPropertyFileChange={setSelectedPropertyFileId}
-              />
-            </div> */}
-
-            {/* Campaign and Call Sections */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Campaign Section */}
+            {/* Key Metrics Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {loadingMetrics ? (
+                Array(4).fill(0).map((_, idx) => (
+                  <div key={idx} className="bg-gray-800 p-6 rounded-lg border border-gray-700 animate-pulse h-28" />
+                ))
+              ) : (
+                <>
               <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-              <h2 className="text-xl font-bold text-white mb-6 flex items-center">
-                <BarChart3 className="h-5 w-5 mr-2" />
-                Campaign Management
-              </h2>
-            
-            <div className="space-y-4 mb-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Campaign Name
-                </label>
-                <input
-                  type="text"
-                  value={campaignName}
-                  onChange={(e) => setCampaignName(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter campaign name"
-                />
+                    <div className="flex items-center">
+                      <div className="p-3 rounded-lg bg-blue-500">
+                        <Users className="h-6 w-6 text-white" />
               </div>
-              
-
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Campaign Prompt
-                </label>
-                <textarea
-                  rows={3}
-                  value={campaignPrompt}
-                  onChange={(e) => setCampaignPrompt(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter your campaign prompt (e.g., 'Hello, I'm calling about our real estate services...')"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Available Services File
-                </label>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="file"
-                    accept=".json,.txt"
-                    className="flex-1 px-3 py-2 bg-gray-900 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <button className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
-                    <Upload className="h-4 w-4" />
-                  </button>
+                      <div className="ml-4">
+                        <p className="text-sm font-medium text-gray-300">Total Leads</p>
+                        <p className="text-2xl font-bold text-white">{dashboardMetrics?.totalLeads || 0}</p>
+                        <p className="text-xs text-green-400">Real-time data</p>
                 </div>
               </div>
             </div>
             
-            <div className="space-y-4 mb-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Campaign Schedule
-                </label>
-                <div className="flex space-x-4">
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="campaignSchedule"
-                      value="now"
-                      checked={campaignSchedule === 'now'}
-                      onChange={(e) => setCampaignSchedule(e.target.value as 'now' | 'schedule')}
-                      className="mr-2"
-                    />
-                    <span className="text-gray-300">Start Now</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="campaignSchedule"
-                      value="schedule"
-                      checked={campaignSchedule === 'schedule'}
-                      onChange={(e) => setCampaignSchedule(e.target.value as 'now' | 'schedule')}
-                      className="mr-2"
-                    />
-                    <span className="text-gray-300">Schedule Campaign</span>
-                  </label>
+                  <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
+                    <div className="flex items-center">
+                      <div className="p-3 rounded-lg bg-green-500">
+                        <Phone className="h-6 w-6 text-white" />
                 </div>
+                      <div className="ml-4">
+                        <p className="text-sm font-medium text-gray-300">Calls Today</p>
+                        <p className="text-2xl font-bold text-white">{dashboardMetrics?.callsToday || 0}</p>
+                        <p className="text-xs text-green-400">From VAPI</p>
               </div>
-
-              {campaignSchedule === 'schedule' && (
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Timezone
-                    </label>
-                    <select
-                      value={timezone}
-                      onChange={(e) => setTimezone(e.target.value)}
-                      className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      {timezones.map(tz => (
-                        <option key={tz.value} value={tz.value}>
-                          {tz.label} ({tz.offset})
-                        </option>
-                      ))}
-                    </select>
-                    <div className="mt-1 text-xs text-gray-400">
-                      Current time: {getCurrentTimeInTimezone(timezone)}
                     </div>
                   </div>
                   
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Scheduling Type
-                    </label>
-                    <div className="flex space-x-4">
-                      <label className="flex items-center">
-                        <input
-                          type="radio"
-                          name="scheduleType"
-                          value="specific"
-                          checked={!useTimeOfDay}
-                          onChange={() => setUseTimeOfDay(false)}
-                          className="mr-2"
-                        />
-                        <span className="text-gray-300">Specific Date & Time</span>
-                      </label>
-                      <label className="flex items-center">
-                        <input
-                          type="radio"
-                          name="scheduleType"
-                          value="timeOfDay"
-                          checked={useTimeOfDay}
-                          onChange={() => setUseTimeOfDay(true)}
-                          className="mr-2"
-                        />
-                        <span className="text-gray-300">Time of Day</span>
-                      </label>
+                  <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
+                    <div className="flex items-center">
+                      <div className="p-3 rounded-lg bg-purple-500">
+                        <BarChart3 className="h-6 w-6 text-white" />
                     </div>
+                      <div className="ml-4">
+                        <p className="text-sm font-medium text-gray-300">Conversion Rate</p>
+                        <p className="text-2xl font-bold text-white">{dashboardMetrics?.conversionRate || 0}%</p>
+                        <p className="text-xs text-green-400">Calculated from leads</p>
                   </div>
+                        </div>
+                        </div>
 
-                  {!useTimeOfDay ? (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Scheduled Date & Time
-                      </label>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs text-gray-400 mb-1">Date</label>
-                          <input
-                            type="date"
-                            value={campaignScheduledTime ? campaignScheduledTime.split('T')[0] : ''}
-                            onChange={(e) => {
-                              const date = e.target.value;
-                              const time = campaignScheduledTime ? campaignScheduledTime.split('T')[1] || '12:00' : '12:00';
-                              setCampaignScheduledTime(`${date}T${time}`);
-                            }}
-                            min={new Date().toISOString().split('T')[0]}
-                            className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs text-gray-400 mb-1">Time</label>
-                          <input
-                            type="time"
-                            value={campaignScheduledTime ? campaignScheduledTime.split('T')[1] || '12:00' : '12:00'}
-                            onChange={(e) => {
-                              const time = e.target.value;
-                              const date = campaignScheduledTime ? campaignScheduledTime.split('T')[0] : new Date().toISOString().split('T')[0];
-                              setCampaignScheduledTime(`${date}T${time}`);
-                            }}
-                            className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </div>
+                  <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
+                    <div className="flex items-center">
+                      <div className="p-3 rounded-lg bg-orange-500">
+                        <Calendar className="h-6 w-6 text-white" />
                       </div>
-                      {campaignScheduledTime && (
-                        <div className="mt-1 text-xs text-gray-400">
-                          UTC: {new Date(campaignScheduledTime).toISOString()}
+                      <div className="ml-4">
+                        <p className="text-sm font-medium text-gray-300">Active Campaigns</p>
+                        <p className="text-2xl font-bold text-white">{dashboardMetrics?.activeCampaigns || 0}</p>
+                        <p className="text-xs text-blue-400">From VAPI</p>
                         </div>
-                      )}
                     </div>
-                  ) : (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Call Time of Day
-                      </label>
-                      <input
-                        type="time"
-                        value={callTimeOfDay}
-                        onChange={(e) => setCallTimeOfDay(e.target.value)}
-                        className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <div className="mt-1 text-xs text-gray-400">
-                        Calls will be made at {callTimeOfDay} in {timezone} timezone
                       </div>
-                    </div>
-                  )}
-                </div>
+                </>
               )}
             </div>
 
-
-
+            {/* Quick Actions */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+                  <Plus className="h-5 w-5 mr-2" />
+                  Quick Actions
+                </h3>
+                <div className="space-y-3">
             <button
-              onClick={handleCreateCampaign}
-              disabled={isCreatingCampaign}
-              className={`w-full text-white py-2 px-4 rounded-md font-medium transition-colors flex items-center justify-center ${
-                isCreatingCampaign 
-                  ? 'bg-gray-600 cursor-not-allowed' 
-                  : 'bg-green-600 hover:bg-green-700'
-              }`}
-            >
-              {isCreatingCampaign ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Creating Campaign...
-                </>
-              ) : (
-                <>
-                  <Plus className="h-4 w-4 mr-2" />
-                  {campaignSchedule === 'now' ? 'Start Now' : 'Schedule Campaign'}
-                </>
-              )}
+                    onClick={() => onNavigate('leads')}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-md font-medium transition-colors flex items-center justify-center"
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    Add New Lead
             </button>
-            
-            {/* Campaign List */}
-            <div className="mt-6 space-y-3">
-              <h3 className="text-lg font-medium text-white">Active Campaigns</h3>
-              {campaigns.map((campaign) => (
-                <div key={campaign.id} className="bg-gray-900 p-4 rounded-md border border-gray-600">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium text-white">{campaign.name}</h4>
-                      <p className="text-sm text-gray-400">{campaign.leads} leads • {campaign.status}</p>
-                    </div>
                     <button
-                      onClick={() => deleteCampaign(campaign.id)}
-                      className="text-red-400 hover:text-red-300 p-1"
+                    onClick={() => setActiveTab('calls')}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white py-3 px-4 rounded-md font-medium transition-colors flex items-center justify-center"
+                  >
+                    <Phone className="h-4 w-4 mr-2" />
+                    Make Single Call
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('campaigns')}
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 px-4 rounded-md font-medium transition-colors flex items-center justify-center"
                     >
-                      <Trash2 className="h-4 w-4" />
+                    <BarChart3 className="h-4 w-4 mr-2" />
+                    Create Campaign
                     </button>
                   </div>
                 </div>
-              ))}
+
+              <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+                  <Clock className="h-5 w-5 mr-2" />
+                  Recent Activity
+                </h3>
+                <div className="space-y-3">
+                  {loadingMetrics ? (
+                    Array(4).fill(0).map((_, idx) => (
+                      <div key={idx} className="p-3 bg-gray-700 rounded-md animate-pulse h-16" />
+                    ))
+                  ) : dashboardMetrics?.recentActivity && dashboardMetrics.recentActivity.length > 0 ? (
+                    dashboardMetrics.recentActivity.slice(0, 4).map((activity, index) => (
+                      <div key={activity.id || index} className="flex items-center space-x-3 p-3 bg-gray-700 rounded-md">
+                        <div className={`w-2 h-2 rounded-full ${
+                          activity.type === 'call' ? 'bg-green-400' :
+                          activity.type === 'lead' ? 'bg-blue-400' :
+                          activity.type === 'campaign' ? 'bg-purple-400' :
+                          'bg-orange-400'
+                        }`}></div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-white">{activity.title}</p>
+                          <p className="text-xs text-gray-400">
+                            {new Date(activity.timestamp).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center text-gray-400 py-4">
+                      <p className="text-sm">No recent activity</p>
+                    </div>
+                  )}
             </div>
           </div>
 
-          {/* Single Call Section */}
           <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-            <h2 className="text-xl font-bold text-white mb-6 flex items-center">
-              <Phone className="h-5 w-5 mr-2" />
-              Single Call
-            </h2>
-            
-            <div className="space-y-4 mb-6">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+                  <BarChart3 className="h-5 w-5 mr-2" />
+                  Performance Summary
+                </h3>
+                <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Customer Name
-                </label>
-                <input
-                  type="text"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter customer name"
-                />
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-300">Call Success Rate</span>
+                      <span className="text-white font-medium">{dashboardMetrics?.performanceMetrics.callSuccessRate || 0}%</span>
               </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Mobile Number
-                </label>
-                <input
-                  type="tel"
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter mobile number"
-                />
+                    <div className="w-full bg-gray-700 rounded-full h-2 mt-1">
+                      <div className="bg-green-500 h-2 rounded-full" style={{width: `${dashboardMetrics?.performanceMetrics.callSuccessRate || 0}%`}}></div>
               </div>
-              
+                  </div>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Additional Info (Optional)
-                </label>
-                <textarea
-                  rows={3}
-                  value={customerInfo}
-                  onChange={(e) => setCustomerInfo(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter any additional information about the customer"
-                />
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-300">Lead Response Rate</span>
+                      <span className="text-white font-medium">{dashboardMetrics?.performanceMetrics.leadResponseRate || 0}%</span>
               </div>
-
+                    <div className="w-full bg-gray-700 rounded-full h-2 mt-1">
+                      <div className="bg-blue-500 h-2 rounded-full" style={{width: `${dashboardMetrics?.performanceMetrics.leadResponseRate || 0}%`}}></div>
+                    </div>
+                  </div>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Call Schedule
-                </label>
-                <div className="flex space-x-4">
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="callSchedule"
-                      value="now"
-                      checked={callSchedule === 'now'}
-                      onChange={(e) => setCallSchedule(e.target.value as 'now' | 'schedule')}
-                      className="mr-2"
-                    />
-                    <span className="text-gray-300">Call Now</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="callSchedule"
-                      value="schedule"
-                      checked={callSchedule === 'schedule'}
-                      onChange={(e) => setCallSchedule(e.target.value as 'now' | 'schedule')}
-                      className="mr-2"
-                    />
-                    <span className="text-gray-300">Schedule Call</span>
-                  </label>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-300">Conversion Rate</span>
+                      <span className="text-white font-medium">{dashboardMetrics?.performanceMetrics.conversionRate || 0}%</span>
+                    </div>
+                    <div className="w-full bg-gray-700 rounded-full h-2 mt-1">
+                      <div className="bg-purple-500 h-2 rounded-full" style={{width: `${dashboardMetrics?.performanceMetrics.conversionRate || 0}%`}}></div>
+                    </div>
+                  </div>
+                </div>
                 </div>
               </div>
 
-              {callSchedule === 'schedule' && (
+            {/* Lead Status Overview */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
+                <h3 className="text-lg font-semibold text-white mb-4">Lead Status Distribution</h3>
                 <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Timezone
-                    </label>
-                    <select
-                      value={timezone}
-                      onChange={(e) => setTimezone(e.target.value)}
-                      className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      {timezones.map(tz => (
-                        <option key={tz.value} value={tz.value}>
-                          {tz.label} ({tz.offset})
-                        </option>
-                      ))}
-                    </select>
-                    <div className="mt-1 text-xs text-gray-400">
-                      Current time: {getCurrentTimeInTimezone(timezone)}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-blue-500 rounded-full mr-3"></div>
+                      <span className="text-gray-300">New Leads</span>
                     </div>
+                    <span className="text-white font-medium">{dashboardMetrics?.leadStatusDistribution.new || 0}</span>
                   </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Scheduling Type
-                    </label>
-                    <div className="flex space-x-4">
-                      <label className="flex items-center">
-                        <input
-                          type="radio"
-                          name="callScheduleType"
-                          value="specific"
-                          checked={!useTimeOfDay}
-                          onChange={() => setUseTimeOfDay(false)}
-                          className="mr-2"
-                        />
-                        <span className="text-gray-300">Specific Date & Time</span>
-                      </label>
-                      <label className="flex items-center">
-                        <input
-                          type="radio"
-                          name="callScheduleType"
-                          value="timeOfDay"
-                          checked={useTimeOfDay}
-                          onChange={() => setUseTimeOfDay(true)}
-                          className="mr-2"
-                        />
-                        <span className="text-gray-300">Time of Day</span>
-                      </label>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-yellow-500 rounded-full mr-3"></div>
+                      <span className="text-gray-300">Contacted</span>
                     </div>
+                    <span className="text-white font-medium">{dashboardMetrics?.leadStatusDistribution.contacted || 0}</span>
                   </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-purple-500 rounded-full mr-3"></div>
+                      <span className="text-gray-300">Qualified</span>
+                        </div>
+                    <span className="text-white font-medium">{dashboardMetrics?.leadStatusDistribution.qualified || 0}</span>
+                        </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
+                      <span className="text-gray-300">Converted</span>
+                      </div>
+                    <span className="text-white font-medium">{dashboardMetrics?.leadStatusDistribution.converted || 0}</span>
+                        </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-red-500 rounded-full mr-3"></div>
+                      <span className="text-gray-300">Lost</span>
+                    </div>
+                    <span className="text-white font-medium">{dashboardMetrics?.leadStatusDistribution.lost || 0}</span>
+                  </div>
+                </div>
+              </div>
 
-                  {!useTimeOfDay ? (
+              <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
+                <h3 className="text-lg font-semibold text-white mb-4">Today's Schedule</h3>
+                <div className="space-y-3">
+                  {loadingMetrics ? (
+                    Array(3).fill(0).map((_, idx) => (
+                      <div key={idx} className="p-3 bg-gray-700 rounded-md animate-pulse h-16" />
+                    ))
+                  ) : dashboardMetrics?.todaysSchedule && dashboardMetrics.todaysSchedule.length > 0 ? (
+                    dashboardMetrics.todaysSchedule.slice(0, 3).map((schedule, index) => (
+                      <div key={schedule.id || index} className="flex items-center justify-between p-3 bg-gray-700 rounded-md">
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Scheduled Date & Time
-                      </label>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs text-gray-400 mb-1">Date</label>
-                          <input
-                            type="date"
-                            value={scheduledTime ? scheduledTime.split('T')[0] : ''}
-                            onChange={(e) => {
-                              const date = e.target.value;
-                              const time = scheduledTime ? scheduledTime.split('T')[1] || '12:00' : '12:00';
-                              setScheduledTime(`${date}T${time}`);
-                            }}
-                            min={new Date().toISOString().split('T')[0]}
-                            className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs text-gray-400 mb-1">Time</label>
-                          <input
-                            type="time"
-                            value={scheduledTime ? scheduledTime.split('T')[1] || '12:00' : '12:00'}
-                            onChange={(e) => {
-                              const time = e.target.value;
-                              const date = scheduledTime ? scheduledTime.split('T')[0] : new Date().toISOString().split('T')[0];
-                              setScheduledTime(`${date}T${time}`);
-                            }}
-                            className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </div>
+                          <p className="text-sm font-medium text-white">{schedule.title}</p>
+                          <p className="text-xs text-gray-400">{schedule.contact} - {schedule.time}</p>
                       </div>
-                      {scheduledTime && (
-                        <div className="mt-1 text-xs text-gray-400">
-                          UTC: {new Date(scheduledTime).toISOString()}
-                        </div>
-                      )}
+                        <span className={`text-xs text-white px-2 py-1 rounded-full ${
+                          schedule.status === 'scheduled' ? 'bg-blue-500' :
+                          schedule.status === 'confirmed' ? 'bg-green-500' :
+                          'bg-purple-500'
+                        }`}>
+                          {schedule.status}
+                        </span>
                     </div>
+                    ))
                   ) : (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Call Time of Day
-                      </label>
-                      <input
-                        type="time"
-                        value={callTimeOfDay}
-                        onChange={(e) => setCallTimeOfDay(e.target.value)}
-                        className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <div className="mt-1 text-xs text-gray-400">
-                        Call will be made at {callTimeOfDay} in {timezone} timezone
-                      </div>
-                    </div>
-                  )}
+                    <div className="text-center text-gray-400 py-4">
+                      <p className="text-sm">No scheduled activities</p>
                 </div>
               )}
+                </div>
+              </div>
             </div>
             
-            <button
-              onClick={handleMakeCall}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md font-medium transition-colors flex items-center justify-center"
-            >
-              <Phone className="h-4 w-4 mr-2" />
-              {callSchedule === 'now' ? 'Call Now' : 'Schedule Call'}
-            </button>
-            
-            {/* Scheduled Calls Section */}
-            {scheduledCalls.length > 0 && (
-              <div className="mt-6 space-y-3">
-                <h3 className="text-lg font-medium text-white">Scheduled Calls</h3>
-                {scheduledCalls.map((call) => (
-                  <div key={call.id} className="bg-gray-900 p-4 rounded-md border border-gray-600">
-                    <div className="flex items-center justify-between">
+            {/* System Status */}
+            <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+                <CheckCircle className="h-5 w-5 mr-2" />
+                System Status
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className={`flex items-center space-x-3 p-3 rounded-md border ${
+                  dashboardMetrics?.systemStatus.vapi 
+                    ? 'bg-green-900 border-green-700' 
+                    : 'bg-red-900 border-red-700'
+                }`}>
+                  {dashboardMetrics?.systemStatus.vapi ? (
+                    <CheckCircle className="h-5 w-5 text-green-400" />
+                  ) : (
+                    <div className="h-5 w-5 bg-red-400 rounded-full"></div>
+                  )}
                       <div>
-                        <h4 className="font-medium text-white">{call.request.customer.name}</h4>
-                        <p className="text-sm text-gray-400">
-                          {call.request.customer.number} • {new Date(call.scheduledTime).toLocaleString()}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          Status: {call.status} • ID: {call.id}
+                    <p className="text-sm font-medium text-white">VAPI Calling</p>
+                    <p className={`text-xs ${
+                      dashboardMetrics?.systemStatus.vapi ? 'text-green-300' : 'text-red-300'
+                    }`}>
+                      {dashboardMetrics?.systemStatus.vapi ? 'Connected & Ready' : 'Not Configured'}
                         </p>
                       </div>
-                      <button
-                        onClick={() => handleCancelScheduledCall(call.id)}
-                        className="text-red-400 hover:text-red-300 p-1"
-                        title="Cancel scheduled call"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
                     </div>
+                <div className={`flex items-center space-x-3 p-3 rounded-md border ${
+                  dashboardMetrics?.systemStatus.email 
+                    ? 'bg-green-900 border-green-700' 
+                    : 'bg-red-900 border-red-700'
+                }`}>
+                  {dashboardMetrics?.systemStatus.email ? (
+                    <CheckCircle className="h-5 w-5 text-green-400" />
+                  ) : (
+                    <div className="h-5 w-5 bg-red-400 rounded-full"></div>
+                  )}
+                  <div>
+                    <p className="text-sm font-medium text-white">Email Service</p>
+                    <p className={`text-xs ${
+                      dashboardMetrics?.systemStatus.email ? 'text-green-300' : 'text-red-300'
+                    }`}>
+                      {dashboardMetrics?.systemStatus.email ? 'Gmail SMTP Active' : 'Not Configured'}
+                    </p>
                   </div>
-                ))}
               </div>
-            )}
+                <div className={`flex items-center space-x-3 p-3 rounded-md border ${
+                  dashboardMetrics?.systemStatus.database 
+                    ? 'bg-green-900 border-green-700' 
+                    : 'bg-red-900 border-red-700'
+                }`}>
+                  {dashboardMetrics?.systemStatus.database ? (
+                    <CheckCircle className="h-5 w-5 text-green-400" />
+                  ) : (
+                    <div className="h-5 w-5 bg-red-400 rounded-full"></div>
+                  )}
+                  <div>
+                    <p className="text-sm font-medium text-white">Database</p>
+                    <p className={`text-xs ${
+                      dashboardMetrics?.systemStatus.database ? 'text-green-300' : 'text-red-300'
+                    }`}>
+                      {dashboardMetrics?.systemStatus.database ? 'Supabase Connected' : 'Connection Failed'}
+                    </p>
+                  </div>
+                </div>
           </div>
         </div>
           </div>
@@ -1004,15 +865,9 @@ export default function DashboardPage({ onNavigate }: DashboardPageProps) {
         {/* Campaign History Tab */}
         {activeTab === 'campaigns' && (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div>
                 <h3 className="text-lg font-semibold text-white mb-4">Campaign Manager</h3>
                 <CampaignManager />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-white mb-4">Campaign Status Monitor</h3>
-                <CampaignStatusChecker />
-              </div>
             </div>
             <div>
               <h3 className="text-lg font-semibold text-white mb-4">Advanced Analytics</h3>
@@ -1025,7 +880,12 @@ export default function DashboardPage({ onNavigate }: DashboardPageProps) {
           </div>
         )}
 
-
+        {/* Analytics Tab */}
+        {activeTab === 'analytics' && (
+          <div className="space-y-6">
+            <AdvancedAnalytics />
+          </div>
+        )}
       </main>
 
       <Footer />
