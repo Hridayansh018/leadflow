@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '../../../services/supabase';
+import { supabaseAdmin } from '../../../services/supabaseAdmin';
 
 // GET /api/emails - Get all stored emails
 export async function GET(request: NextRequest) {

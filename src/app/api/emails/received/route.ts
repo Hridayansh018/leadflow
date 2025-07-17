@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '../../../../services/supabase';
+import { supabaseAdmin } from '../../../../services/supabaseAdmin';
 import receivedEmailService from '../../../../services/receivedEmailService';
 
 // GET /api/emails/received - Fetch received emails

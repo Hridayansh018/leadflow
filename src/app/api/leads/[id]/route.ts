@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '../../../../services/supabase';
+import { supabaseAdmin } from '../../../../services/supabaseAdmin';
+
+console.log("SUPABASE_SERVICE_ROLE_KEY:", process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 // GET /api/leads/[id] - Get a single lead
 export async function GET(

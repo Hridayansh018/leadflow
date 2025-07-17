@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '../../../services/supabase';
+import { supabaseAdmin } from '../../../services/supabaseAdmin';
 
 // GET /api/leads - Get all leads
 export async function GET(request: NextRequest) {

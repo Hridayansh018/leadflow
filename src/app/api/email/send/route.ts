@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
-import { supabaseAdmin } from '../../../../services/supabase';
+import { supabaseAdmin } from '../../../../services/supabaseAdmin';
 
 interface EmailRecipient {
   name: string;
