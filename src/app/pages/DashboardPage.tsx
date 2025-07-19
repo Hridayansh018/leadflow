@@ -813,25 +813,6 @@ export default function DashboardPage({ onNavigate }: DashboardPageProps) {
                       </div>
                     </div>
                 <div className={`flex items-center space-x-3 p-3 rounded-md border ${
-                  dashboardMetrics?.systemStatus.email 
-                    ? 'bg-green-900 border-green-700' 
-                    : 'bg-red-900 border-red-700'
-                }`}>
-                  {dashboardMetrics?.systemStatus.email ? (
-                    <CheckCircle className="h-5 w-5 text-green-400" />
-                  ) : (
-                    <div className="h-5 w-5 bg-red-400 rounded-full"></div>
-                  )}
-                  <div>
-                    <p className="text-sm font-medium text-white">Email Service</p>
-                    <p className={`text-xs ${
-                      dashboardMetrics?.systemStatus.email ? 'text-green-300' : 'text-red-300'
-                    }`}>
-                      {dashboardMetrics?.systemStatus.email ? 'Gmail SMTP Active' : 'Not Configured'}
-                    </p>
-                  </div>
-              </div>
-                <div className={`flex items-center space-x-3 p-3 rounded-md border ${
                   dashboardMetrics?.systemStatus.database 
                     ? 'bg-green-900 border-green-700' 
                     : 'bg-red-900 border-red-700'

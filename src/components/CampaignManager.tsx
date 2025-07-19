@@ -58,9 +58,6 @@ export default function CampaignManager() {
   const [loading, setLoading] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [showAnalytics, setShowAnalytics] = useState(false);
-  const [analytics, setAnalytics] = useState<CampaignAnalytics | null>(null);
-  const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [templates] = useState<CampaignTemplate[]>(vapiService.getCampaignTemplates());
   const [selectedTemplate, setSelectedTemplate] = useState<CampaignTemplate | null>(null);
@@ -118,7 +115,7 @@ export default function CampaignManager() {
     }
   };
 
-  const handleCampaignAction = async (campaignId: string, action: 'pause' | 'resume' | 'stop' | 'delete') => {
+  const handleCampaignAction = async (campaignId: string, action: 'pause' | 'stop' | 'delete') => {
     try {
       setActionLoading(campaignId);
       
@@ -126,9 +123,6 @@ export default function CampaignManager() {
       switch (action) {
         case 'pause':
           result = await vapiService.pauseCampaign(campaignId);
-          break;
-        case 'resume':
-          result = await vapiService.resumeCampaign(campaignId);
           break;
         case 'stop':
           result = await vapiService.stopCampaign(campaignId);
@@ -146,9 +140,6 @@ export default function CampaignManager() {
             switch (action) {
               case 'pause':
                 newStatus = 'paused';
-                break;
-              case 'resume':
-                newStatus = 'active';
                 break;
               case 'stop':
                 newStatus = 'completed';
@@ -171,25 +162,6 @@ export default function CampaignManager() {
       alert(`❌ Error ${action}ing campaign: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setActionLoading(null);
-    }
-  };
-
-  const loadCampaignAnalytics = async (campaignId: string) => {
-    try {
-      setAnalyticsLoading(true);
-      const result = await vapiService.getCampaignAnalytics(campaignId);
-      
-      if (result.success && result.data) {
-        setAnalytics(result.data);
-        setShowAnalytics(true);
-      } else {
-        alert(`❌ ${result.message}`);
-      }
-    } catch (error) {
-      console.error('Error loading analytics:', error);
-      alert(`❌ Error loading analytics: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setAnalyticsLoading(false);
     }
   };
 
@@ -261,87 +233,11 @@ export default function CampaignManager() {
   };
 
   const canPause = (status: string) => status === 'active';
-  const canResume = (status: string) => status === 'paused';
   const canStop = (status: string) => ['active', 'paused'].includes(status);
   const canDelete = (status: string) => ['completed', 'failed'].includes(status);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
-  };
-
-  const renderAnalytics = () => {
-    if (!analytics) return null;
-
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-gray-800 rounded-lg p-6 w-full max-w-6xl max-h-[90vh] overflow-y-auto">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-white">Campaign Analytics</h3>
-            <button
-              onClick={() => setShowAnalytics(false)}
-              className="text-gray-400 hover:text-white"
-            >
-              ✕
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="bg-gray-700 p-4 rounded-lg">
-              <div className="text-2xl font-bold text-white">{analytics.totalCalls}</div>
-              <div className="text-sm text-gray-300">Total Calls</div>
-                </div>
-            <div className="bg-gray-700 p-4 rounded-lg">
-              <div className="text-2xl font-bold text-green-400">{analytics.answeredCalls}</div>
-              <div className="text-sm text-gray-300">Answered Calls</div>
-              </div>
-            <div className="bg-gray-700 p-4 rounded-lg">
-              <div className="text-2xl font-bold text-blue-400">{analytics.answerRate.toFixed(1)}%</div>
-              <div className="text-sm text-gray-300">Answer Rate</div>
-            </div>
-            <div className="bg-gray-700 p-4 rounded-lg">
-              <div className="text-2xl font-bold text-purple-400">{analytics.conversionRate.toFixed(1)}%</div>
-              <div className="text-sm text-gray-300">Conversion Rate</div>
-              </div>
-            </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-gray-700 p-4 rounded-lg">
-              <h4 className="text-lg font-semibold text-white mb-4">Call Timeline (Last 7 Days)</h4>
-              <div className="space-y-2">
-                {analytics.callTimeline.map((day, index) => (
-                  <div key={index} className="flex items-center justify-between">
-                    <span className="text-gray-300 text-sm">{day.date}</span>
-                    <div className="flex items-center space-x-4">
-                      <span className="text-blue-400 text-sm">{day.calls} calls</span>
-                      <span className="text-green-400 text-sm">{day.answered} answered</span>
-                      <span className="text-purple-400 text-sm">{day.conversions} conversions</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-gray-700 p-4 rounded-lg">
-              <h4 className="text-lg font-semibold text-white mb-4">Top Performing Leads</h4>
-              <div className="space-y-2">
-                {analytics.topPerformingLeads.slice(0, 5).map((lead, index) => (
-                  <div key={index} className="flex items-center justify-between p-2 bg-gray-600 rounded">
-                    <div>
-                      <div className="text-white font-medium">{lead.name}</div>
-                      <div className="text-gray-300 text-sm">{lead.phone}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-green-400 text-sm">{lead.interest}</div>
-                      <div className="text-gray-300 text-xs">{lead.duration}s</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
   };
 
   const renderTemplates = () => {
@@ -507,17 +403,6 @@ export default function CampaignManager() {
                   </button>
                 )}
                 
-                {canResume(campaign.status) && (
-                  <button
-                    onClick={() => handleCampaignAction(campaign.id, 'resume')}
-                    disabled={actionLoading === campaign.id}
-                    className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center"
-                  >
-                    <Play className="h-3 w-3 mr-1" />
-                    Resume
-                  </button>
-                )}
-                
                 {canStop(campaign.status) && (
                   <button
                     onClick={() => handleCampaignAction(campaign.id, 'stop')}
@@ -541,15 +426,6 @@ export default function CampaignManager() {
                 )}
                 
                 <button
-                  onClick={() => loadCampaignAnalytics(campaign.id)}
-                  disabled={analyticsLoading}
-                  className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center"
-                >
-                  <BarChart3 className="h-3 w-3 mr-1" />
-                  Analytics
-                </button>
-                
-                <button
                   onClick={() => setSelectedCampaign(campaign.id)}
                   className="px-3 py-1 text-sm bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors flex items-center"
                 >
@@ -569,7 +445,6 @@ export default function CampaignManager() {
         </div>
       )}
 
-      {showAnalytics && renderAnalytics()}
       {showTemplates && renderTemplates()}
     </div>
   );

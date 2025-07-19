@@ -35,6 +35,7 @@ interface VAPICampaignRequest {
   timeOfDay?: string;
   timezone?: string;
   metadata?: Record<string, unknown>;
+  property_details?: string; // <-- add property_details
 }
 
 // VAPI Campaign Schedule Plan interface
@@ -287,7 +288,7 @@ class VAPIService {
   }
 
   // Make a single call
-  async makeCall(request: VAPICallRequest): Promise<VAPICallResponse> {
+  async makeCall(request: VAPICallRequest & { user_id?: string }): Promise<VAPICallResponse> {
     try {
       if (!this.apiKey) {
         console.error('❌ API key is empty when making call');
@@ -331,6 +332,11 @@ class VAPIService {
       });
       console.log('Using API key ending with:', this.apiKey.slice(-4));
       
+      // Add user_id to metadata
+      const metadata = {
+        ...(request.metadata || {}),
+        ...(request.user_id ? { user_id: request.user_id } : {})
+      };
       const requestPayload = {
         phoneNumberId: request.phoneNumberId,
         assistantId: request.assistantId,
@@ -338,7 +344,7 @@ class VAPIService {
           number: cleanPhoneNumber,
           name: request.customer.name || '',
         },
-        ...(request.metadata && { metadata: request.metadata })
+        ...(Object.keys(metadata).length > 0 && { metadata })
       };
 
       console.log('Sending request payload:', JSON.stringify(requestPayload, null, 2));
@@ -468,7 +474,7 @@ class VAPIService {
   }
 
   // Create a campaign using VAPI's native campaign API
-  async createCampaign(request: VAPICampaignRequest): Promise<VAPICampaignResponse> {
+  async createCampaign(request: VAPICampaignRequest & { user_id?: string }): Promise<VAPICampaignResponse> {
     try {
       if (!this.apiKey) {
         console.error('❌ API key is empty when creating campaign');
@@ -491,7 +497,7 @@ class VAPIService {
         throw new Error('Missing required fields: name, assistantId, phoneNumberId, or leads');
       }
 
-      // Convert leads to VAPI customers format
+      // Convert leads to VAPI customers format, including user_id in metadata
       const customers: VAPICustomer[] = request.leads.map((lead, index) => {
         if (!lead.name || !lead.phone) {
           throw new Error('Each lead must have name and phone number');
@@ -513,7 +519,8 @@ class VAPIService {
         return {
           number: cleanPhone,
           name: lead.name.trim(),
-          externalId: `lead_${index + 1}`
+          externalId: `lead_${index + 1}`,
+          metadata: request.user_id ? { user_id: request.user_id } : undefined
         };
       });
 
@@ -551,7 +558,11 @@ class VAPIService {
         phoneNumberId: request.phoneNumberId,
         assistantId: request.assistantId,
         customers: customers,
-        ...(schedulePlan && { schedulePlan })
+        ...(schedulePlan && { schedulePlan }),
+        metadata: {
+          ...(request.metadata || {}),
+          ...(request.property_details ? { property_details: request.property_details } : {})
+        }
       };
 
       console.log('Campaign request (VAPI format):', JSON.stringify(campaignRequest, null, 2));
@@ -636,7 +647,71 @@ class VAPIService {
     }
   }
 
+  getCampaignTemplates(): Array<{
+    id: string;
+    name: string;
+    description: string;
+    prompt: string;
+    category: 'lead-followup' | 'property-showing' | 'general' | 'custom';
+    variables: string[];
+  }> {
+    return [
+      {
+        id: 'lead-followup',
+        name: 'Lead Follow-up',
+        description: 'Follow up with leads who have shown interest',
+        prompt: `Hi {{recipientName}}, this is {{senderName}} from {{companyName}}. I'm calling about your recent inquiry regarding {{propertyType}} properties. I wanted to check if you're still in the market and if you'd be interested in viewing some properties that match your criteria. We have some great options available in {{location}} that I think would be perfect for you. Would you be available for a quick chat about your requirements?`,
+        category: 'lead-followup',
+        variables: ['recipientName', 'senderName', 'companyName', 'propertyType', 'location']
+      },
+      {
+        id: 'property-showing',
+        name: 'Property Showing Invitation',
+        description: 'Invite leads to view specific properties',
+        prompt: `Hi {{recipientName}}, this is {{senderName}} from {{companyName}}. I'm calling about the {{propertyType}} property at {{propertyAddress}} that you expressed interest in. We have a showing available on {{showingDate}} at {{showingTime}}. This property features {{propertyFeatures}} and is priced at {{propertyPrice}}. Would you be interested in scheduling a viewing? I can also answer any questions you might have about the property or the neighborhood.`,
+        category: 'property-showing',
+        variables: ['recipientName', 'senderName', 'companyName', 'propertyType', 'propertyAddress', 'showingDate', 'showingTime', 'propertyFeatures', 'propertyPrice']
+      },
+      {
+        id: 'market-update',
+        name: 'Market Update',
+        description: 'Share market insights and new listings',
+        prompt: `Hi {{recipientName}}, this is {{senderName}} from {{companyName}}. I wanted to reach out with a quick market update for {{location}}. We've seen some interesting activity in your area recently, and I thought you might be interested in knowing about some new {{propertyType}} listings that have come on the market. The current market conditions are {{marketConditions}}, and we're seeing {{marketTrend}}. Would you like me to send you some information about these new opportunities?`,
+        category: 'general',
+        variables: ['recipientName', 'senderName', 'companyName', 'location', 'propertyType', 'marketConditions', 'marketTrend']
+      },
+      {
+        id: 'callback-request',
+        name: 'Callback Request',
+        description: 'Request a callback from interested leads',
+        prompt: `Hi {{recipientName}}, this is {{senderName}} from {{companyName}}. I'm calling because you left a message requesting a callback about {{inquiryType}}. I wanted to make sure I have all the details right - you were asking about {{specificDetails}}, correct? I'm available to discuss this further at your convenience. What would be the best time to call you back? I'm flexible and can work around your schedule.`,
+        category: 'lead-followup',
+        variables: ['recipientName', 'senderName', 'companyName', 'inquiryType', 'specificDetails']
+      },
+      {
+        id: 'open-house-invitation',
+        name: 'Open House Invitation',
+        description: 'Invite leads to open house events',
+        prompt: `Hi {{recipientName}}, this is {{senderName}} from {{companyName}}. I'm calling to personally invite you to our open house this {{openHouseDate}} from {{openHouseTime}} at {{propertyAddress}}. This {{propertyType}} property is one of our most popular listings and features {{propertyHighlights}}. We're expecting a good turnout, so I wanted to make sure you had the details. There will be refreshments and I'll be available to answer any questions. Would you be able to make it?`,
+        category: 'property-showing',
+        variables: ['recipientName', 'senderName', 'companyName', 'openHouseDate', 'openHouseTime', 'propertyAddress', 'propertyType', 'propertyHighlights']
+      }
+    ];
+  }
 
+  processCampaignTemplate(templateId: string, variables: Record<string, string>): string {
+    const templates = this.getCampaignTemplates();
+    const template = templates.find(t => t.id === templateId);
+    if (!template) {
+      return '';
+    }
+    let processedPrompt = template.prompt;
+    Object.entries(variables).forEach(([key, value]) => {
+      const placeholder = `{{${key}}}`;
+      processedPrompt = processedPrompt.replace(new RegExp(placeholder, 'g'), value);
+    });
+    return processedPrompt;
+  }
 
   // Get call status
   async getCallStatus(callId: string): Promise<VAPICallStatusResponse> {
@@ -707,10 +782,8 @@ class VAPIService {
   // Get all calls
   async getCalls(): Promise<VAPICallStatusResponse[]> {
     try {
-      const response = await axios.get(
-        `${this.baseURL}/call`,
-        { headers: this.getHeaders() }
-      );
+      // Use the local proxy API route to avoid CORS issues
+      const response = await axios.get('/api/vapi/calls');
       return response.data as VAPICallStatusResponse[];
     } catch (error) {
       console.error('Error getting calls:', error);
@@ -908,53 +981,16 @@ class VAPIService {
     }
   }
 
-  // Resume a campaign
-  async resumeCampaign(campaignId: string): Promise<{ success: boolean; message: string }> {
-    try {
-      if (!this.apiKey) {
-        throw new Error('VAPI API key not configured');
-      }
-
-      console.log(`Resuming campaign ${campaignId}`);
-      
-      const response = await axios.patch(
-        `${this.baseURL}/campaign/${campaignId}`,
-        { status: 'active' },
-        { headers: this.getHeaders() }
-      );
-      
-      console.log('Campaign resumed successfully:', response.data);
-      
-      return {
-        success: true,
-        message: 'Campaign resumed successfully'
-      };
-    } catch (error) {
-      console.error('Error resuming campaign:', error);
-      return {
-        success: false,
-        message: `Failed to resume campaign: ${error instanceof Error ? error.message : 'Unknown error'}`
-      };
-    }
-  }
-
-  // Stop a campaign
   async stopCampaign(campaignId: string): Promise<{ success: boolean; message: string }> {
     try {
       if (!this.apiKey) {
         throw new Error('VAPI API key not configured');
       }
-
-      console.log(`Stopping campaign ${campaignId}`);
-      
       const response = await axios.patch(
         `${this.baseURL}/campaign/${campaignId}`,
         { status: 'completed' },
         { headers: this.getHeaders() }
       );
-      
-      console.log('Campaign stopped successfully:', response.data);
-      
       return {
         success: true,
         message: 'Campaign stopped successfully'
@@ -968,22 +1004,15 @@ class VAPIService {
     }
   }
 
-  // Delete a campaign
   async deleteCampaign(campaignId: string): Promise<{ success: boolean; message: string }> {
     try {
       if (!this.apiKey) {
         throw new Error('VAPI API key not configured');
       }
-
-      console.log(`Deleting campaign ${campaignId}`);
-      
       const response = await axios.delete(
         `${this.baseURL}/campaign/${campaignId}`,
         { headers: this.getHeaders() }
       );
-      
-      console.log('Campaign deleted successfully:', response.data);
-      
       return {
         success: true,
         message: 'Campaign deleted successfully'
@@ -996,263 +1025,8 @@ class VAPIService {
       };
     }
   }
-
-  // Get detailed campaign analytics with real calculations
-  async getCampaignAnalytics(campaignId: string): Promise<{
-    success: boolean;
-    data?: {
-      totalCalls: number;
-      answeredCalls: number;
-      unansweredCalls: number;
-      failedCalls: number;
-      averageCallDuration: number;
-      answerRate: number;
-      successRate: number;
-      conversionRate: number;
-      leadsGenerated: number;
-      callbackRequests: number;
-      interestedCustomers: number;
-      callTimeline: Array<{
-        date: string;
-        calls: number;
-        answered: number;
-        conversions: number;
-      }>;
-      topPerformingLeads: Array<{
-        name: string;
-        phone: string;
-        status: string;
-        duration: number;
-        interest: string;
-      }>;
-    };
-    message?: string;
-  }> {
-    try {
-      if (!this.apiKey) {
-        throw new Error('VAPI API key not configured');
-      }
-
-      console.log(`Getting analytics for campaign ${campaignId}`);
-      
-      // Get campaign details
-      const campaignDetails = await this.getCampaignDetails(campaignId);
-      const campaign = campaignDetails.campaign;
-      const callStatuses = campaignDetails.callStatuses;
-      
-      // Get all calls to analyze campaign performance
-      const allCalls = await this.getCalls();
-      const campaignCalls = allCalls.filter(call => {
-        const metadata = call.metadata as { campaignId?: string } | undefined;
-        return metadata?.campaignId === campaignId;
-      });
-      
-      // Calculate real analytics
-      const totalCalls = campaignCalls.length;
-      const answeredCalls = campaignCalls.filter(call => call.status === 'answered').length;
-      const unansweredCalls = campaignCalls.filter(call => call.status === 'unanswered').length;
-      const failedCalls = campaignCalls.filter(call => call.status === 'failed').length;
-      
-      // Calculate rates
-      const answerRate = totalCalls > 0 ? (answeredCalls / totalCalls) * 100 : 0;
-      const successRate = totalCalls > 0 ? ((answeredCalls + unansweredCalls) / totalCalls) * 100 : 0;
-      
-      // Calculate average call duration (estimate based on status)
-      // In a real implementation, this would come from call recordings
-      const averageCallDuration = answeredCalls > 0 ? 
-        Math.floor(Math.random() * 180) + 60 : 0; // 1-4 minutes for answered calls
-      
-      // Calculate conversion rate based on call outcomes
-      const conversionRate = answeredCalls > 0 ? 
-        Math.floor(Math.random() * 30) + 10 : 0; // 10-40% conversion rate
-      
-      // Calculate leads generated (new leads from this campaign)
-      const leadsGenerated = Math.floor(answeredCalls * 0.3); // 30% of answered calls generate leads
-      
-      // Calculate callback requests and interested customers
-      const callbackRequests = Math.floor(answeredCalls * 0.4); // 40% request callbacks
-      const interestedCustomers = Math.floor(answeredCalls * 0.25); // 25% show high interest
-      
-      // Generate call timeline for the last 7 days
-      const callTimeline = this.generateCallTimeline(campaignCalls);
-      
-      // Generate top performing leads
-      const topPerformingLeads = this.generateTopPerformingLeads(campaignCalls);
-      
-      const analytics = {
-        totalCalls,
-        answeredCalls,
-        unansweredCalls,
-        failedCalls,
-        averageCallDuration,
-        answerRate,
-        successRate,
-        conversionRate,
-        leadsGenerated,
-        callbackRequests,
-        interestedCustomers,
-        callTimeline,
-        topPerformingLeads
-      };
-      
-      console.log(`Campaign ${campaignId} analytics:`, analytics);
-      
-      return {
-        success: true,
-        data: analytics
-      };
-    } catch (error) {
-      console.error('Error getting campaign analytics:', error);
-      return {
-        success: false,
-        message: `Failed to get campaign analytics: ${error instanceof Error ? error.message : 'Unknown error'}`
-      };
-    }
-  }
-
-  // Generate call timeline for analytics
-  private generateCallTimeline(calls: VAPICallStatusResponse[]): Array<{
-    date: string;
-    calls: number;
-    answered: number;
-    conversions: number;
-  }> {
-    const timeline: Array<{
-      date: string;
-      calls: number;
-      answered: number;
-      conversions: number;
-    }> = [];
-    
-    // Generate last 7 days
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      const dateStr = date.toISOString().split('T')[0];
-      
-      // Filter calls for this date
-      const dayCalls = calls.filter(call => {
-        const callDate = new Date(call.createdAt).toISOString().split('T')[0];
-        return callDate === dateStr;
-      });
-      
-      const dayAnswered = dayCalls.filter(call => call.status === 'answered').length;
-      const dayConversions = Math.floor(dayAnswered * 0.3); // 30% conversion rate
-      
-      timeline.push({
-        date: dateStr,
-        calls: dayCalls.length,
-        answered: dayAnswered,
-        conversions: dayConversions
-      });
-    }
-    
-    return timeline;
-  }
-
-  // Generate top performing leads
-  private generateTopPerformingLeads(calls: VAPICallStatusResponse[]): Array<{
-    name: string;
-    phone: string;
-    status: string;
-    duration: number;
-    interest: string;
-  }> {
-    // Filter answered calls and sort by potential performance
-    const answeredCalls = calls
-      .filter(call => call.status === 'answered')
-      .slice(0, 5); // Top 5
-    
-    return answeredCalls.map((call, index) => {
-      const interestLevels = ['high', 'medium', 'low'];
-      const interest = interestLevels[index % interestLevels.length];
-      const duration = Math.floor(Math.random() * 300) + 60; // 1-6 minutes
-      
-      return {
-        name: call.customer.name || `Lead ${index + 1}`,
-        phone: call.customer.number,
-        status: call.status,
-        duration,
-        interest
-      };
-    });
-  }
-
-  // Get campaign templates
-  getCampaignTemplates(): Array<{
-    id: string;
-    name: string;
-    description: string;
-    prompt: string;
-    category: 'lead-followup' | 'property-showing' | 'general' | 'custom';
-    variables: string[];
-  }> {
-    return [
-      {
-        id: 'lead-followup',
-        name: 'Lead Follow-up',
-        description: 'Follow up with leads who have shown interest',
-        prompt: `Hi {{recipientName}}, this is {{senderName}} from {{companyName}}. I'm calling about your recent inquiry regarding {{propertyType}} properties. I wanted to check if you're still in the market and if you'd be interested in viewing some properties that match your criteria. We have some great options available in {{location}} that I think would be perfect for you. Would you be available for a quick chat about your requirements?`,
-        category: 'lead-followup',
-        variables: ['recipientName', 'senderName', 'companyName', 'propertyType', 'location']
-      },
-      {
-        id: 'property-showing',
-        name: 'Property Showing Invitation',
-        description: 'Invite leads to view specific properties',
-        prompt: `Hi {{recipientName}}, this is {{senderName}} from {{companyName}}. I'm calling about the {{propertyType}} property at {{propertyAddress}} that you expressed interest in. We have a showing available on {{showingDate}} at {{showingTime}}. This property features {{propertyFeatures}} and is priced at {{propertyPrice}}. Would you be interested in scheduling a viewing? I can also answer any questions you might have about the property or the neighborhood.`,
-        category: 'property-showing',
-        variables: ['recipientName', 'senderName', 'companyName', 'propertyType', 'propertyAddress', 'showingDate', 'showingTime', 'propertyFeatures', 'propertyPrice']
-      },
-      {
-        id: 'market-update',
-        name: 'Market Update',
-        description: 'Share market insights and new listings',
-        prompt: `Hi {{recipientName}}, this is {{senderName}} from {{companyName}}. I wanted to reach out with a quick market update for {{location}}. We've seen some interesting activity in your area recently, and I thought you might be interested in knowing about some new {{propertyType}} listings that have come on the market. The current market conditions are {{marketConditions}}, and we're seeing {{marketTrend}}. Would you like me to send you some information about these new opportunities?`,
-        category: 'general',
-        variables: ['recipientName', 'senderName', 'companyName', 'location', 'propertyType', 'marketConditions', 'marketTrend']
-      },
-      {
-        id: 'callback-request',
-        name: 'Callback Request',
-        description: 'Request a callback from interested leads',
-        prompt: `Hi {{recipientName}}, this is {{senderName}} from {{companyName}}. I'm calling because you left a message requesting a callback about {{inquiryType}}. I wanted to make sure I have all the details right - you were asking about {{specificDetails}}, correct? I'm available to discuss this further at your convenience. What would be the best time to call you back? I'm flexible and can work around your schedule.`,
-        category: 'lead-followup',
-        variables: ['recipientName', 'senderName', 'companyName', 'inquiryType', 'specificDetails']
-      },
-      {
-        id: 'open-house-invitation',
-        name: 'Open House Invitation',
-        description: 'Invite leads to open house events',
-        prompt: `Hi {{recipientName}}, this is {{senderName}} from {{companyName}}. I'm calling to personally invite you to our open house this {{openHouseDate}} from {{openHouseTime}} at {{propertyAddress}}. This {{propertyType}} property is one of our most popular listings and features {{propertyHighlights}}. We're expecting a good turnout, so I wanted to make sure you had the details. There will be refreshments and I'll be available to answer any questions. Would you be able to make it?`,
-        category: 'property-showing',
-        variables: ['recipientName', 'senderName', 'companyName', 'openHouseDate', 'openHouseTime', 'propertyAddress', 'propertyType', 'propertyHighlights']
-      }
-    ];
-  }
-
-  // Process campaign template with variables
-  processCampaignTemplate(templateId: string, variables: Record<string, string>): string {
-    const templates = this.getCampaignTemplates();
-    const template = templates.find(t => t.id === templateId);
-    
-    if (!template) {
-      throw new Error(`Template '${templateId}' not found`);
-    }
-
-    let processedPrompt = template.prompt;
-    
-    // Replace variables in template
-    Object.entries(variables).forEach(([key, value]) => {
-      const placeholder = `{{${key}}}`;
-      processedPrompt = processedPrompt.replace(new RegExp(placeholder, 'g'), value);
-    });
-
-    return processedPrompt;
-  }
-
-
 }
 
 const vapiService = new VAPIService();
-export default vapiService; 
+export { vapiService };
+export default vapiService;

@@ -156,40 +156,6 @@ export default function LoginPage({ onNavigate }: LoginPageProps) {
           <div className="text-center">
             <button
               type="button"
-              onClick={() => setIsSignUp(!isSignUp)}
-              className="text-blue-400 hover:text-blue-300 text-sm"
-            >
-              {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
-            </button>
-          </div>
-
-          {!isSignUp && (
-          <div className="space-y-3">
-            <div className="text-center">
-              <p className="text-sm text-gray-400">Test Credentials:</p>
-            </div>
-            <div className="flex space-x-2">
-              <button
-                type="button"
-                onClick={() => fillTestCredentials('admin')}
-                className="flex-1 py-2 px-4 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-800 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                Admin User
-              </button>
-              <button
-                type="button"
-                onClick={() => fillTestCredentials('demo')}
-                className="flex-1 py-2 px-4 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-800 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                Demo User
-              </button>
-            </div>
-          </div>
-          )}
-
-          <div className="text-center">
-            <button
-              type="button"
               onClick={() => onNavigate('landing')}
               className="text-blue-400 hover:text-blue-300 text-sm"
             >

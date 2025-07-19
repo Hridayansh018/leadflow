@@ -168,7 +168,7 @@ export default function CallHistoryTable() {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="rounded-lg shadow-md p-6">
         <div className="flex items-center justify-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
           <span className="ml-2 text-gray-600">Loading call history...</span>
@@ -178,9 +178,9 @@ export default function CallHistoryTable() {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
+    <div className="bg-gray-800 rounded-lg shadow-md p-6">
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-semibold text-gray-900">Call History</h3>
+        <h3 className="text-lg font-semibold text-blue-400">Call History</h3>
         <div className="flex space-x-2">
           <button
             onClick={() => setShowSingleCallModal(true)}
@@ -312,27 +312,25 @@ export default function CallHistoryTable() {
             {filteredCalls.map((call) => {
               const callType = call.metadata?.campaignId ? 'campaign' : 'single';
               return (
-                <tr key={call.id} className="bg-white border-b hover:bg-gray-50">
+                <tr key={call.id} className={`bg-gray-900 border-b hover:bg-gray-800 text-white`}>
                   <td className="px-6 py-4">
                     <div>
-                      <div className="font-medium text-gray-900">
+                      <div className="font-medium text-white">
                         {call.customer?.name || 'Unknown'}
                       </div>
-                      <div className="text-gray-500">{call.customer?.number}</div>
+                      <div className="text-gray-400">{call.customer?.number}</div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(call.status)}`}>
-                      {call.status}
-                    </span>
+                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(call.status)}`}>{call.status}</span>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center">
                       {getTypeIcon(callType)}
-                      <span className="ml-1 capitalize">{callType}</span>
+                      <span className="ml-1 capitalize text-gray-300">{callType}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-gray-500">
+                  <td className="px-6 py-4 text-gray-400">
                     {formatDate(call.createdAt)}
                   </td>
                   <td className="px-6 py-4 text-gray-500">

@@ -35,6 +35,7 @@ export default function CampaignCreator() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [templates] = useState<CampaignTemplate[]>(vapiService.getCampaignTemplates());
+  const [propertyDetails, setPropertyDetails] = useState('');
 
   const handleTemplateSelect = (template: CampaignTemplate) => {
     setSelectedTemplate(template);
@@ -120,6 +121,11 @@ export default function CampaignCreator() {
       return;
     }
 
+    if (!propertyDetails.trim()) {
+      showWarning('Please enter property details');
+      return;
+    }
+
     if (selectedLeads.length === 0) {
       showWarning('Please select at least one lead');
       return;
@@ -133,7 +139,8 @@ export default function CampaignCreator() {
         name: campaignName,
         prompt: getFinalPrompt(),
         leads: selectedLeads,
-        status: 'scheduled'
+        status: 'scheduled',
+        property_details: propertyDetails // <-- include property details
       };
 
       await vapiService.createCampaign({
@@ -148,7 +155,8 @@ export default function CampaignCreator() {
             phone: lead?.phone || '',
             info: lead?.email || ''
           };
-        })
+        }),
+        property_details: campaignData.property_details // <-- pass to backend
       });
       
       showSuccess('Campaign created successfully!');
@@ -158,6 +166,7 @@ export default function CampaignCreator() {
       setSelectedTemplate(null);
       setCustomPrompt('');
       setSelectedLeads([]);
+      setPropertyDetails('');
       clearUploadedData();
     } catch (error) {
       console.error('Error creating campaign:', error);
@@ -382,6 +391,20 @@ export default function CampaignCreator() {
                 )}
               </div>
 
+              {/* Property Details */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Property Details (for customer SMS/alert) *
+                </label>
+                <textarea
+                  value={propertyDetails}
+                  onChange={e => setPropertyDetails(e.target.value)}
+                  placeholder="Enter property details for this campaign..."
+                  rows={3}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
               {/* Action Buttons */}
               <div className="flex justify-end space-x-3 pt-4 border-t border-gray-700">
                 <button
@@ -392,7 +415,7 @@ export default function CampaignCreator() {
                 </button>
                 <button
                   onClick={createCampaign}
-                  disabled={loading || !campaignName.trim() || !getFinalPrompt().trim() || selectedLeads.length === 0}
+                  disabled={loading || !campaignName.trim() || !getFinalPrompt().trim() || selectedLeads.length === 0 || !propertyDetails.trim()}
                   className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                 >
                   {loading ? (

@@ -1,7 +1,6 @@
 import { supabase } from './supabase';
 import vapiService from './vapiService';
 import leadService from './leadService';
-import emailDataService from './emailDataService';
 
 export interface DashboardMetrics {
   totalLeads: number;
@@ -50,13 +49,11 @@ class DashboardService {
         leadsData,
         callsData,
         campaignsData,
-        emailsData,
         vapiStatus
       ] = await Promise.all([
         this.getLeadsData(),
         this.getCallsData(),
         this.getCampaignsData(),
-        this.getEmailsData(),
         this.getVAPIStatus()
       ]);
 
@@ -83,7 +80,7 @@ class DashboardService {
       };
 
       // Get recent activity
-      const recentActivity = await this.getRecentActivity(leadsData, callsData, campaignsData, emailsData);
+      const recentActivity = await this.getRecentActivity(leadsData, callsData, campaignsData);
 
       // Get today's schedule
       const todaysSchedule = await this.getTodaysSchedule(callsData, campaignsData);
@@ -91,7 +88,7 @@ class DashboardService {
       // System status
       const systemStatus = {
         vapi: vapiStatus.connected,
-        email: emailsData.configured,
+        email: false, // Email metrics are removed
         database: true // Supabase connection is handled by the client
       };
 
@@ -182,25 +179,6 @@ class DashboardService {
     }
   }
 
-  private async getEmailsData() {
-    try {
-      const response = await emailDataService.getEmails();
-      const emails = response.emails || [];
-      
-      // Check if email service is configured
-      const configured = !!(process.env.GMAIL_EMAIL && process.env.GMAIL_APP_PASSWORD);
-      
-      return {
-        total: emails.length,
-        configured: configured,
-        emails: emails
-      };
-    } catch (error) {
-      console.error('Error fetching emails data:', error);
-      return { total: 0, configured: false, emails: [] };
-    }
-  }
-
   private async getVAPIStatus() {
     try {
       const status = vapiService.getConfigurationStatus();
@@ -236,7 +214,7 @@ class DashboardService {
     return Math.round((contactedLeads / leadsData.total) * 100);
   }
 
-  private async getRecentActivity(leadsData: any, callsData: any, campaignsData: any, emailsData: any) {
+  private async getRecentActivity(leadsData: any, callsData: any, campaignsData: any) {
     const activities: any[] = [];
 
     // Add recent calls
@@ -272,18 +250,6 @@ class DashboardService {
         title: `Campaign ${campaign.status} - ${campaign.name}`,
         timestamp: campaign.created_at,
         status: campaign.status
-      });
-    });
-
-    // Add recent emails
-    const recentEmails = emailsData.emails.slice(0, 2);
-    recentEmails.forEach((email: any) => {
-      activities.push({
-        id: email.id,
-        type: 'email',
-        title: `Email sent - ${email.subject}`,
-        timestamp: email.created_at,
-        status: email.status
       });
     });
 

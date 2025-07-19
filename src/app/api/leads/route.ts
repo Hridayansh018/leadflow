@@ -55,50 +55,37 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/leads - Create a new lead
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const body = await request.json();
-    
-    // Validate required fields
-    if (!body.name || !body.email || !body.phone || !body.user_id) {
-      return NextResponse.json(
-        { error: 'Missing required fields: name, email, phone, user_id' },
-        { status: 400 }
-      );
+    const filters = await req.json();
+    let query = supabaseAdmin.from('leads').select('*');
+
+    // Apply filters if provided
+    if (filters.user_id) {
+      query = query.eq('user_id', filters.user_id);
+    }
+    if (filters.interest) {
+      query = query.eq('interest', filters.interest);
+    }
+    if (filters.leadstatus) {
+      query = query.eq('leadstatus', filters.leadstatus);
+    }
+    if (filters.status) {
+      query = query.eq('status', filters.status);
+    }
+    if (filters.created_after) {
+      query = query.gte('created_at', filters.created_after);
+    }
+    if (filters.created_before) {
+      query = query.lte('created_at', filters.created_before);
     }
 
-    const lead = {
-      name: body.name,
-      email: body.email,
-      phone: body.phone,
-      status: body.status || 'new',
-      notes: body.notes || '',
-      user_id: body.user_id,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-
-    const { data, error } = await supabaseAdmin
-      .from('leads')
-      .insert(lead)
-      .select()
-      .single();
-
+    const { data, error } = await query.order('created_at', { ascending: false });
     if (error) {
-      console.error('Error creating lead:', error);
-      return NextResponse.json(
-        { error: 'Failed to create lead' },
-        { status: 500 }
-      );
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
-
-    return NextResponse.json(data, { status: 201 });
-  } catch (error) {
-    console.error('Error creating lead:', error);
-    return NextResponse.json(
-      { error: 'Failed to create lead' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: true, data });
+  } catch (err) {
+    return NextResponse.json({ success: false, error: (err as Error).message }, { status: 500 });
   }
 } 

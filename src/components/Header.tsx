@@ -16,7 +16,6 @@ export default function Header({ onNavigate, currentRoute }: HeaderProps) {
     { id: 'dashboard', label: 'Dashboard', icon: Phone },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'leads', label: 'Leads', icon: Users },
-    { id: 'email', label: 'Email', icon: Mail },
   ];
 
   const handleContactDeveloper = () => {
@@ -32,7 +31,7 @@ export default function Header({ onNavigate, currentRoute }: HeaderProps) {
             <h1 className="text-xl font-bold text-white">LeadFlow</h1>
           </div>
           
-          <nav className="flex space-x-8">
+          <nav className="flex space-x-8 items-center justify-center w-full h-full">
             {navItems.map((item) => {
               const Icon = item.icon;
               return (
@@ -55,19 +54,16 @@ export default function Header({ onNavigate, currentRoute }: HeaderProps) {
           <div className="flex items-center space-x-4">
             <button
               onClick={handleContactDeveloper}
-              className="flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+              className="flex items-center px-3 py-2 rounded-md text-nowrap text-sm font-medium text-gray-300 hover:bg-blue-600 hover:text-white transition-colors"
             >
               <MessageSquare className="h-4 w-4 mr-2" />
               Contact Developer
             </button>
-            <div className="text-sm text-gray-300">
-              Welcome, {user?.name}
-            </div>
             <button
               onClick={logout}
-              className="flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+              className="flex items-center bg-gray-600 px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-red-600 hover:text-white transition-colors"
             >
-              <LogOut className="h-4 w-4 mr-2" />
+              <LogOut className="h-4 w-4 mr-2 " />
               Logout
             </button>
           </div>

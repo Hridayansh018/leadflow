@@ -62,6 +62,8 @@ export interface Database {
           name: string;
           email: string;
           phone: string;
+          interest: string | null; // yes/no
+          leadstatus: string; // pending, converted, dropped
           status: string;
           notes: string | null;
           created_at: string;
@@ -73,6 +75,8 @@ export interface Database {
           name: string;
           email: string;
           phone: string;
+          interest?: string | null;
+          leadstatus?: string;
           status?: string;
           notes?: string | null;
           created_at?: string;
@@ -84,6 +88,8 @@ export interface Database {
           name?: string;
           email?: string;
           phone?: string;
+          interest?: string | null;
+          leadstatus?: string;
           status?: string;
           notes?: string | null;
           created_at?: string;
@@ -125,9 +131,10 @@ export interface Database {
           user_id: string;
           customer_name: string;
           customer_phone: string;
-          call_status: string;
+          call_status: string; // answered, unanswered, rejected, requested callback
           duration: number | null;
           notes: string | null;
+          interest: string | null; // yes/no
           created_at: string;
         };
         Insert: {
@@ -138,6 +145,7 @@ export interface Database {
           call_status: string;
           duration?: number | null;
           notes?: string | null;
+          interest?: string | null;
           created_at?: string;
         };
         Update: {
@@ -148,6 +156,7 @@ export interface Database {
           call_status?: string;
           duration?: number | null;
           notes?: string | null;
+          interest?: string | null;
           created_at?: string;
         };
       };
