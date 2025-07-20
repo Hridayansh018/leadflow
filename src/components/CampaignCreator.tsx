@@ -153,10 +153,11 @@ export default function CampaignCreator() {
           return {
             name: lead?.name || 'Unknown',
             phone: lead?.phone || '',
-            info: lead?.email || ''
+            info: lead?.email || '',
+            metadata: { property_details: campaignData.property_details } // <-- add property_details to metadata
           };
         }),
-        property_details: campaignData.property_details // <-- pass to backend
+        // property_details: campaignData.property_details // <-- remove this line
       });
       
       showSuccess('Campaign created successfully!');
