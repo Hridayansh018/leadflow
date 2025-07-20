@@ -851,53 +851,77 @@ class VAPIService {
     }
   }
 
-  // Get detailed campaign information including call statuses
+  // Get detailed campaign information including call details
   async getCampaignDetails(campaignId: string): Promise<{
-    campaign: VAPICampaignResponse;
-    callStatuses: Array<{
-      callId: string;
-      customerName: string;
-      phoneNumber: string;
-      status: string;
-      duration?: string;
-      createdAt: string;
-    }>;
+    campaign: any;
+    callDetails: Array<any>;
   }> {
     try {
-      // Get campaign status
-      const campaign = await this.getCampaignStatus(campaignId);
-      
-      // Get all calls to find campaign calls
-      const allCalls = await this.getCalls();
-      
-      // Filter calls that belong to this campaign
-      const campaignCalls = allCalls.filter(call => {
-        // Check if call metadata contains campaign ID
-        const metadata = call.metadata as { campaignId?: string } | undefined;
-        return metadata?.campaignId === campaignId;
+      // Fetch campaign details
+      const response = await axios.get(`${this.baseURL}/campaign/${campaignId}`, {
+        headers: this.getHeaders(),
       });
-      
-      const callStatuses = campaignCalls.map(call => ({
-        callId: call.id,
-        customerName: call.customer.name || 'Unknown',
-        phoneNumber: call.customer.number,
-        status: call.status,
-        duration: '0:00', // VAPI doesn't return duration in call status
-        createdAt: call.createdAt
-      }));
-      
-      console.log(`Campaign ${campaignId} details:`, {
-        campaign,
-        callCount: callStatuses.length,
-        callStatuses
+      const campaign = response.data;
+      const callIds = campaign.calls ? Object.keys(campaign.calls) : [];
+      // Fetch each call's details in parallel
+      const callDetails = await Promise.all(
+        callIds.map(async (callId) => {
+          try {
+            const callResp = await axios.get(`${this.baseURL}/call/${callId}`, {
+              headers: this.getHeaders(),
+            });
+            console.log('Fetched call details for', callId, callResp.data);
+            return callResp.data;
+          } catch (err) {
+            if (axios.isAxiosError(err)) {
+              console.error('Error fetching call details for', callId, {
+                message: err.message,
+                code: err.code,
+                config: err.config,
+                response: err.response,
+                data: err.response?.data,
+                toJSON: err.toJSON(),
+              });
+            } else {
+              console.error('Unknown error fetching call details for', callId, err);
+            }
+            return null;
+          }
+        })
+      );
+      // Filter out failed/null call details
+      const successfulCallDetails = callDetails.filter(Boolean);
+      if (successfulCallDetails.length === 0 && callIds.length > 0) {
+        throw new Error('All call detail requests failed. Check your network, API key, or CORS configuration.');
+      }
+      // Map to UI-friendly fields
+      const mappedCallDetails = successfulCallDetails.map((call: any) => {
+        // Calculate duration if not present
+        let duration = call.duration;
+        if (!duration && call.createdAt && call.updatedAt) {
+          const ms = new Date(call.updatedAt).getTime() - new Date(call.createdAt).getTime();
+          if (!isNaN(ms) && ms > 0) {
+            const totalSeconds = Math.floor(ms / 1000);
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            duration = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+          } else {
+            duration = '-';
+          }
+        }
+        return {
+          callId: call.id,
+          customerName: call.customer?.name || '-',
+          phoneNumber: call.customer?.number || '-',
+          status: call.status || '-',
+          duration: duration || '-',
+          createdAt: call.createdAt,
+          endedReason: call.endedReason || '-',
+        };
       });
-      
-      return {
-        campaign,
-        callStatuses
-      };
+      return { campaign, callDetails: mappedCallDetails };
     } catch (error) {
-      console.error('Error getting campaign details:', error);
+      console.error('Error in getCampaignDetails:', error);
       throw error;
     }
   }

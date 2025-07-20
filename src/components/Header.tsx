@@ -3,6 +3,7 @@
 import React from 'react';
 import { Phone, BarChart3, Users, Mail, LogOut, MessageSquare } from 'lucide-react';
 import { useAuth } from '../app/context/AuthContext';
+import { Button } from "./ui/button";
 
 interface HeaderProps {
   onNavigate: (route: string) => void;
@@ -35,37 +36,36 @@ export default function Header({ onNavigate, currentRoute }: HeaderProps) {
             {navItems.map((item) => {
               const Icon = item.icon;
               return (
-                <button
+                <Button
                   key={item.id}
                   onClick={() => onNavigate(item.id)}
-                  className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    currentRoute === item.id
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-                  }`}
+                  variant={currentRoute === item.id ? "default" : "ghost"}
+                  className="flex items-center"
                 >
                   <Icon className="h-4 w-4 mr-2" />
                   {item.label}
-                </button>
+                </Button>
               );
             })}
           </nav>
 
           <div className="flex items-center space-x-4">
-            <button
+            <Button
               onClick={handleContactDeveloper}
-              className="flex items-center px-3 py-2 rounded-md text-nowrap text-sm font-medium text-gray-300 hover:bg-blue-600 hover:text-white transition-colors"
+              variant="outline"
+              className="flex items-center text-nowrap"
             >
               <MessageSquare className="h-4 w-4 mr-2" />
               Contact Developer
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={logout}
-              className="flex items-center bg-gray-600 px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-red-600 hover:text-white transition-colors"
+              variant="destructive"
+              className="flex items-center"
             >
               <LogOut className="h-4 w-4 mr-2 " />
               Logout
-            </button>
+            </Button>
           </div>
         </div>
       </div>

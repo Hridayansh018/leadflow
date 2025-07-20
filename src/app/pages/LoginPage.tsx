@@ -13,14 +13,12 @@ export default function LoginPage({ onNavigate }: LoginPageProps) {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
-  const { login, signUp } = useAuth();
+  const { login, signUp, loading } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
 
     try {
       let success = false;
@@ -37,17 +35,15 @@ export default function LoginPage({ onNavigate }: LoginPageProps) {
         }
       } else {
         success = await login(email, password);
-      if (success) {
-        onNavigate('dashboard');
-      } else {
-        setError('Invalid email or password');
+        if (success) {
+          onNavigate('dashboard');
+        } else {
+          setError('Invalid email or password');
         }
       }
     } catch (err) {
       console.error('Auth error:', err);
       setError('An error occurred. Please try again.');
-    } finally {
-      setLoading(false);
     }
   };
 

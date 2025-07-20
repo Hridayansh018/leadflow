@@ -6,6 +6,10 @@ import Header from '../../components/Header';
 import Footer from '../../components/Footer';
 import leadService, { Lead } from '../../services/leadService';
 import { showSuccess, showError } from '../../utils/toastUtils';
+import { Card, CardHeader, CardTitle, CardContent } from "../../components/ui/card";
+import { Button } from "../../components/ui/button";
+import { Input } from "../../components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
 
 interface LeadPageProps {
   onNavigate: (route: string) => void;
@@ -93,215 +97,182 @@ export default function LeadPage({ onNavigate }: LeadPageProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
       <Header onNavigate={onNavigate} currentRoute="leads" />
-      
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Lead Management</h1>
-          <p className="text-gray-300">Manage and track your real estate leads</p>
-        </div>
-
-        {/* Search and Filters */}
-        <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <input
-                type="text"
-                placeholder="Search leads..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All Statuses</option>
-              <option value="new">New</option>
-              <option value="contacted">Contacted</option>
-              <option value="qualified">Qualified</option>
-              <option value="converted">Converted</option>
-              <option value="lost">Lost</option>
-            </select>
-            
-            <button
-              onClick={loadLeads}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-            >
-              Refresh
-            </button>
-          </div>
-        </div>
-
-        {/* Leads Table */}
-        <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-700">
-            <h2 className="text-xl font-semibold text-white">
-              Leads ({filteredLeads.length})
-            </h2>
-          </div>
-          
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <span className="ml-2 text-gray-300">Loading leads...</span>
-            </div>
-          ) : filteredLeads.length === 0 ? (
-            <div className="text-center py-8 text-gray-400">
-              <p>No leads found</p>
-              <p className="text-sm mt-2">Add leads manually to get started</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left text-gray-300">
-                <thead className="text-xs text-gray-400 uppercase bg-gray-700">
-                  <tr>
-                    <th className="px-6 py-3">Name</th>
-                    <th className="px-6 py-3">Contact</th>
-                    <th className="px-6 py-3">Status</th>
-                    <th className="px-6 py-3">Notes</th>
-                    <th className="px-6 py-3">Created</th>
-                    <th className="px-6 py-3">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredLeads.map((lead) => (
-                    <tr key={lead.id} className="bg-gray-800 border-b border-gray-700 hover:bg-gray-700">
-                      <td className="px-6 py-4 font-medium text-white">
-                        {lead.name}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="space-y-1">
-                          <div className="flex items-center text-gray-300">
-                            <Mail className="h-4 w-4 mr-2" />
-                            {lead.email}
-                          </div>
-                          <div className="flex items-center text-gray-300">
-                            <Phone className="h-4 w-4 mr-2" />
-                            {lead.phone}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(lead.status)}`}>
-                          {lead.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-gray-300">
-                        {lead.notes || '-'}
-                      </td>
-                      <td className="px-6 py-4 text-gray-300">
-                        {lead.created_at ? formatDate(lead.created_at) : '-'}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => handleEditLead(lead)}
-                            className="text-blue-400 hover:text-blue-300 transition-colors"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteLead(lead.id!)}
-                            className="text-red-400 hover:text-red-300 transition-colors"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-      {/* Edit Modal */}
-      {isEditing && selectedLead && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-gray-800 p-6 rounded-lg w-full max-w-md">
-              <h3 className="text-xl font-semibold text-white mb-4">Edit Lead</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Name</label>
-                <input
+        <Card className="mb-8 bg-[var(--card)] text-[var(--card-foreground)]">
+          <CardHeader>
+            <CardTitle className="text-3xl font-bold">Lead Management</CardTitle>
+            <p className="text-[var(--muted-foreground)]">Manage and track your real estate leads</p>
+          </CardHeader>
+          <CardContent>
+            {/* Search and Filters */}
+            <div className="mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Input
                   type="text"
-                  value={editForm.name || ''}
-                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white"
+                  placeholder="Search leads..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full"
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Email</label>
-                <input
-                  type="email"
-                  value={editForm.email || ''}
-                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Phone</label>
-                <input
-                  type="tel"
-                  value={editForm.phone || ''}
-                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Status</label>
                 <select
-                  value={editForm.status || ''}
-                    onChange={(e) => setEditForm({ ...editForm, status: e.target.value as any })}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-4 py-2 bg-[var(--input)] border border-[var(--border)] rounded-md text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                 >
+                  <option value="">All Statuses</option>
                   <option value="new">New</option>
                   <option value="contacted">Contacted</option>
                   <option value="qualified">Qualified</option>
                   <option value="converted">Converted</option>
                   <option value="lost">Lost</option>
                 </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Notes</label>
-                <textarea
-                  value={editForm.notes || ''}
-                    onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white"
-                  rows={3}
-                />
+                <Button onClick={loadLeads} variant="outline">Refresh</Button>
               </div>
             </div>
-            <div className="flex justify-end space-x-3 mt-6">
-              <button
-                  onClick={() => {
-                    setIsEditing(false);
-                    setSelectedLead(null);
-                    setEditForm({});
-                  }}
-                  className="px-4 py-2 text-gray-300 hover:text-white transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveEdit}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-              >
-                  Save
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            {/* Leads Table */}
+            <Card className="bg-[var(--muted)] rounded-lg border-[var(--border)] overflow-hidden">
+              <CardHeader className="px-6 py-4 border-b border-[var(--border)]">
+                <CardTitle className="text-xl font-semibold">
+                  Leads ({filteredLeads.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                {loading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary)]"></div>
+                    <span className="ml-2 text-[var(--muted-foreground)]">Loading leads...</span>
+                  </div>
+                ) : filteredLeads.length === 0 ? (
+                  <div className="text-center py-8 text-[var(--muted-foreground)]">
+                    <p>No leads found</p>
+                    <p className="text-sm mt-2">Add leads manually to get started</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left text-[var(--muted-foreground)]">
+                      <thead className="text-xs uppercase bg-[var(--muted)]">
+                        <tr>
+                          <th className="px-6 py-3">Name</th>
+                          <th className="px-6 py-3">Contact</th>
+                          <th className="px-6 py-3">Status</th>
+                          <th className="px-6 py-3">Notes</th>
+                          <th className="px-6 py-3">Created</th>
+                          <th className="px-6 py-3">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredLeads.map((lead) => (
+                          <tr key={lead.id} className="bg-[var(--muted)] border-b border-[var(--border)] hover:bg-[var(--input)]">
+                            <td className="px-6 py-4 font-medium text-[var(--foreground)]">
+                              {lead.name}
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="space-y-1">
+                                <div className="flex items-center text-[var(--muted-foreground)]">
+                                  <Mail className="h-4 w-4 mr-2" />
+                                  {lead.email}
+                                </div>
+                                <div className="flex items-center text-[var(--muted-foreground)]">
+                                  <Phone className="h-4 w-4 mr-2" />
+                                  {lead.phone}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(lead.status)}`}>
+                                {lead.status}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-[var(--muted-foreground)]">
+                              {lead.notes || '-'}
+                            </td>
+                            <td className="px-6 py-4 text-[var(--muted-foreground)]">
+                              {lead.created_at ? formatDate(lead.created_at) : '-'}
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex space-x-2">
+                                <Button onClick={() => handleEditLead(lead)} variant="outline" size="sm">
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button onClick={() => handleDeleteLead(lead.id!)} variant="destructive" size="sm">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            {/* Edit Modal */}
+            <Dialog open={isEditing && !!selectedLead} onOpenChange={() => { setIsEditing(false); setSelectedLead(null); setEditForm({}); }}>
+              <DialogContent className="max-w-md bg-[var(--card)] text-[var(--card-foreground)]">
+                <DialogHeader>
+                  <DialogTitle>Edit Lead</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Name</label>
+                    <Input
+                      type="text"
+                      value={editForm.name || ''}
+                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Email</label>
+                    <Input
+                      type="email"
+                      value={editForm.email || ''}
+                      onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Phone</label>
+                    <Input
+                      type="tel"
+                      value={editForm.phone || ''}
+                      onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Status</label>
+                    <select
+                      value={editForm.status || ''}
+                      onChange={(e) => setEditForm({ ...editForm, status: e.target.value as any })}
+                      className="w-full px-3 py-2 bg-[var(--input)] border border-[var(--border)] rounded-md text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                    >
+                      <option value="new">New</option>
+                      <option value="contacted">Contacted</option>
+                      <option value="qualified">Qualified</option>
+                      <option value="converted">Converted</option>
+                      <option value="lost">Lost</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Notes</label>
+                    <textarea
+                      value={editForm.notes || ''}
+                      onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                      className="w-full px-3 py-2 bg-[var(--input)] border border-[var(--border)] rounded-md text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                      rows={3}
+                    />
+                  </div>
+                </div>
+                <DialogFooter className="flex justify-end space-x-3 mt-6">
+                  <Button variant="outline" onClick={() => { setIsEditing(false); setSelectedLead(null); setEditForm({}); }}>Cancel</Button>
+                  <Button onClick={handleSaveEdit}>Save</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </CardContent>
+        </Card>
       </main>
-
       <Footer />
     </div>
   );

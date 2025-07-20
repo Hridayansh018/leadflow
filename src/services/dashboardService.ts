@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabase } from './supabaseClient';
 import vapiService from './vapiService';
 import leadService from './leadService';
 

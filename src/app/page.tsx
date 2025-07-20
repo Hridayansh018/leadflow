@@ -12,8 +12,22 @@ import { DataProvider } from './context/DataContext';
 type Route = 'landing' | 'login' | 'dashboard' | 'analytics' | 'leads';
 
 function AppContent() {
-  const [currentRoute, setCurrentRoute] = useState<Route>('landing');
   const { isAuthenticated } = useAuth();
+  const [currentRoute, setCurrentRoute] = React.useState<Route>('landing');
+
+  React.useEffect(() => {
+    console.log('isAuthenticated:', isAuthenticated, 'currentRoute:', currentRoute);
+    setCurrentRoute(prevRoute => {
+      if (isAuthenticated && prevRoute !== 'dashboard') {
+        console.log('Switching to dashboard');
+        return 'dashboard';
+      } else if (!isAuthenticated && prevRoute !== 'landing') {
+        console.log('Switching to landing');
+        return 'landing';
+      }
+      return prevRoute;
+    });
+  }, [isAuthenticated]);
 
   const navigate = (route: string) => {
     setCurrentRoute(route as Route);

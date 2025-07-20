@@ -7,6 +7,8 @@ import Footer from '../../components/Footer';
 import CampaignStatusChecker from '../../components/CampaignStatusChecker';
 import vapiService from '../../services/vapiService';
 import leadService from '../../services/leadService';
+import { Card, CardHeader, CardTitle, CardContent } from "../../components/ui/card";
+import { Button } from "../../components/ui/button";
 
 interface AnalyticsPageProps {
   onNavigate: (route: string) => void;
@@ -239,181 +241,170 @@ export default function AnalyticsPage({ onNavigate }: AnalyticsPageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
       <Header onNavigate={onNavigate} currentRoute="analytics" />
-      
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-white mb-2">Analytics Dashboard</h1>
-            <p className="text-gray-300">Real-time campaign and call performance metrics</p>
-          </div>
-          <button
-            onClick={loadAnalytics}
-            disabled={loading}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center"
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
-        </div>
-
-        {error && (
-          <div className="bg-red-900/50 border border-red-700 text-red-300 px-4 py-3 rounded-lg mb-6">
-            {error}
-          </div>
-        )}
-
-        {/* VAPI Data Stats Grid */}
-        <div className="mb-8">
-          <h2 className="text-xl font-bold text-white mb-4">VAPI Performance Metrics</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {stats.map((stat) => {
-              const Icon = stat.icon;
-              return (
-                <div key={stat.name} className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-                  <div className="flex items-center">
-                    <div className={`p-3 rounded-lg ${stat.color}`}>
-                      <Icon className="h-6 w-6 text-white" />
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-300">{stat.name}</p>
-                      <p className="text-2xl font-bold text-white">{stat.value}</p>
-                      <p className="text-xs text-gray-400">{stat.description}</p>
-                    </div>
-                  </div>
+        <Card className="mb-8 bg-[var(--card)] text-[var(--card-foreground)]">
+          <CardHeader>
+            <CardTitle className="text-3xl font-bold">Analytics Dashboard</CardTitle>
+            <p className="text-[var(--muted-foreground)]">Real-time campaign and call performance metrics</p>
+          </CardHeader>
+          <CardContent>
+            <div className="flex justify-end mb-6">
+              <Button onClick={loadAnalytics} disabled={loading} variant="outline">
+                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+            {error && (
+              <div className="bg-red-100 border border-red-300 text-red-700 px-4 py-3 rounded-lg mb-6">
+                {error}
+              </div>
+            )}
+            {/* VAPI Data Stats Grid */}
+            <div className="mb-8">
+              <h2 className="text-xl font-bold mb-4">VAPI Performance Metrics</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {stats.map((stat) => {
+                  const Icon = stat.icon;
+                  return (
+                    <Card key={stat.name} className="p-6 border-[var(--border)] bg-[var(--card)] text-[var(--card-foreground)]">
+                      <div className="flex items-center">
+                        <div className={`p-3 rounded-lg ${stat.color}`}>
+                          <Icon className="h-6 w-6 text-white" />
+                        </div>
+                        <div className="ml-4">
+                          <p className="text-sm font-medium text-[var(--muted-foreground)]">{stat.name}</p>
+                          <p className="text-2xl font-bold">{stat.value}</p>
+                          <p className="text-xs text-[var(--muted-foreground)]">{stat.description}</p>
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+            {/* Database-Dependent Stats Grid */}
+            <div className="mb-8">
+              <h2 className="text-xl font-bold mb-4">Business Metrics (Database)</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {databaseStats.map((stat) => {
+                  const Icon = stat.icon;
+                  return (
+                    <Card key={stat.name} className="p-6 border-[var(--border)] bg-[var(--card)] text-[var(--card-foreground)]">
+                      <div className="flex items-center">
+                        <div className={`p-3 rounded-lg ${stat.color}`}>
+                          <Icon className="h-6 w-6 text-white" />
+                        </div>
+                        <div className="ml-4">
+                          <p className="text-sm font-medium text-[var(--muted-foreground)]">{stat.name}</p>
+                          <p className="text-2xl font-bold">{stat.value}</p>
+                          <p className="text-xs text-[var(--muted-foreground)]">{stat.description}</p>
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+            {/* Call Performance Chart */}
+            <Card className="bg-[var(--muted)] p-6 rounded-lg border-[var(--border)] mb-8">
+              <CardTitle className="text-xl font-bold mb-6 flex items-center">
+                <BarChart3 className="h-5 w-5 mr-2" />
+                Call Performance Overview
+              </CardTitle>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-green-400 mb-2">{analytics.answeredCalls}</div>
+                  <div className="text-sm text-[var(--muted-foreground)]">Answered Calls</div>
                 </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Database-Dependent Stats Grid */}
-        <div className="mb-8">
-          <h2 className="text-xl font-bold text-white mb-4">Business Metrics (Database)</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {databaseStats.map((stat) => {
-              const Icon = stat.icon;
-              return (
-                <div key={stat.name} className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-                  <div className="flex items-center">
-                    <div className={`p-3 rounded-lg ${stat.color}`}>
-                      <Icon className="h-6 w-6 text-white" />
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-300">{stat.name}</p>
-                      <p className="text-2xl font-bold text-white">{stat.value}</p>
-                      <p className="text-xs text-gray-400">{stat.description}</p>
-                    </div>
-                  </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-red-400 mb-2">{analytics.unansweredCalls}</div>
+                  <div className="text-sm text-[var(--muted-foreground)]">Unanswered Calls</div>
                 </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Call Performance Chart */}
-        <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 mb-8">
-          <h2 className="text-xl font-bold text-white mb-6 flex items-center">
-            <BarChart3 className="h-5 w-5 mr-2" />
-            Call Performance Overview
-          </h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-green-400 mb-2">{analytics.answeredCalls}</div>
-              <div className="text-sm text-gray-300">Answered Calls</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-red-400 mb-2">{analytics.unansweredCalls}</div>
-              <div className="text-sm text-gray-300">Unanswered Calls</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-yellow-400 mb-2">{analytics.failedCalls}</div>
-              <div className="text-sm text-gray-300">Failed Calls</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-blue-400 mb-2">{analytics.totalCalls}</div>
-              <div className="text-sm text-gray-300">Total Calls</div>
-            </div>
-          </div>
-          
-          <div className="mt-6">
-            <div className="bg-gray-700 rounded-full h-4 overflow-hidden">
-              <div 
-                className="bg-green-500 h-full transition-all duration-300"
-                style={{ width: `${analytics.answerRate}%` }}
-              ></div>
-            </div>
-            <div className="flex justify-between mt-2 text-sm text-gray-300">
-              <span>Answer Rate: {analytics.answerRate.toFixed(1)}%</span>
-              <span>Miss Rate: {(100 - analytics.answerRate).toFixed(1)}%</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Campaign Status Monitor */}
-        <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 mb-8">
-          <h2 className="text-xl font-bold text-white mb-6 flex items-center">
-            <BarChart3 className="h-5 w-5 mr-2" />
-            Campaign Status Monitor
-          </h2>
-          <CampaignStatusChecker />
-        </div>
-
-        {/* Campaign Performance Table */}
-        <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-          <h2 className="text-xl font-bold text-white mb-6 flex items-center">
-            <BarChart3 className="h-5 w-5 mr-2" />
-            Campaign Performance
-          </h2>
-          
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left text-gray-300">
-              <thead className="text-xs text-gray-400 uppercase bg-gray-700">
-                <tr>
-                  <th scope="col" className="px-6 py-3">Campaign Name</th>
-                  <th scope="col" className="px-6 py-3">Status</th>
-                  <th scope="col" className="px-6 py-3">Leads</th>
-                  <th scope="col" className="px-6 py-3">Calls Made</th>
-                  <th scope="col" className="px-6 py-3">Answer Rate</th>
-                  <th scope="col" className="px-6 py-3">Created</th>
-                </tr>
-              </thead>
-              <tbody>
-                {analytics.totalCampaigns > 0 ? (
-                  <tr className="bg-gray-800 border-b border-gray-700">
-                    <td className="px-6 py-4 font-medium text-white">Real Campaign Data</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2 py-1 rounded-full text-xs ${
-                        analytics.activeCampaigns > 0 ? 'bg-green-900 text-green-300' :
-                        analytics.pausedCampaigns > 0 ? 'bg-yellow-900 text-yellow-300' :
-                        analytics.completedCampaigns > 0 ? 'bg-blue-900 text-blue-300' :
-                        'bg-gray-700 text-gray-300'
-                      }`}>
-                        {analytics.activeCampaigns > 0 ? 'Active' :
-                         analytics.pausedCampaigns > 0 ? 'Paused' :
-                         analytics.completedCampaigns > 0 ? 'Completed' : 'Unknown'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">{analytics.totalLeads}</td>
-                    <td className="px-6 py-4">{analytics.totalCalls}</td>
-                    <td className="px-6 py-4">{analytics.answerRate.toFixed(1)}%</td>
-                    <td className="px-6 py-4">Recent</td>
-                  </tr>
-                ) : (
-                  <tr className="bg-gray-800 border-b border-gray-700">
-                    <td colSpan={6} className="px-6 py-4 text-center text-gray-400">
-                      No campaigns found. Create a campaign to see performance data.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-yellow-400 mb-2">{analytics.failedCalls}</div>
+                  <div className="text-sm text-[var(--muted-foreground)]">Failed Calls</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-blue-400 mb-2">{analytics.totalCalls}</div>
+                  <div className="text-sm text-[var(--muted-foreground)]">Total Calls</div>
+                </div>
+              </div>
+              <div className="mt-6">
+                <div className="bg-gray-700 rounded-full h-4 overflow-hidden">
+                  <div 
+                    className="bg-green-500 h-full transition-all duration-300"
+                    style={{ width: `${analytics.answerRate}%` }}
+                  ></div>
+                </div>
+                <div className="flex justify-between mt-2 text-sm text-[var(--muted-foreground)]">
+                  <span>Answer Rate: {analytics.answerRate.toFixed(1)}%</span>
+                  <span>Miss Rate: {(100 - analytics.answerRate).toFixed(1)}%</span>
+                </div>
+              </div>
+            </Card>
+            {/* Campaign Status Monitor */}
+            <Card className="bg-[var(--muted)] p-6 rounded-lg border-[var(--border)] mb-8">
+              <CardTitle className="text-xl font-bold mb-6 flex items-center">
+                <BarChart3 className="h-5 w-5 mr-2" />
+                Campaign Status Monitor
+              </CardTitle>
+              <CampaignStatusChecker />
+            </Card>
+            {/* Campaign Performance Table */}
+            <Card className="bg-[var(--muted)] p-6 rounded-lg border-[var(--border)]">
+              <CardTitle className="text-xl font-bold mb-6 flex items-center">
+                <BarChart3 className="h-5 w-5 mr-2" />
+                Campaign Performance
+              </CardTitle>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left text-[var(--muted-foreground)]">
+                  <thead className="text-xs uppercase bg-[var(--muted)]">
+                    <tr>
+                      <th className="px-6 py-3">Campaign Name</th>
+                      <th className="px-6 py-3">Status</th>
+                      <th className="px-6 py-3">Leads</th>
+                      <th className="px-6 py-3">Calls Made</th>
+                      <th className="px-6 py-3">Answer Rate</th>
+                      <th className="px-6 py-3">Created</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {analytics.totalCampaigns > 0 ? (
+                      <tr className="bg-[var(--muted)] border-b border-[var(--border)]">
+                        <td className="px-6 py-4 font-medium">Real Campaign Data</td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2 py-1 rounded-full text-xs ${
+                            analytics.activeCampaigns > 0 ? 'bg-green-900 text-green-300' :
+                            analytics.pausedCampaigns > 0 ? 'bg-yellow-900 text-yellow-300' :
+                            analytics.completedCampaigns > 0 ? 'bg-blue-900 text-blue-300' :
+                            'bg-gray-700 text-gray-300'
+                          }`}>
+                            {analytics.activeCampaigns > 0 ? 'Active' :
+                             analytics.pausedCampaigns > 0 ? 'Paused' :
+                             analytics.completedCampaigns > 0 ? 'Completed' : 'Unknown'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">{analytics.totalLeads}</td>
+                        <td className="px-6 py-4">{analytics.totalCalls}</td>
+                        <td className="px-6 py-4">{analytics.answerRate.toFixed(1)}%</td>
+                        <td className="px-6 py-4">Recent</td>
+                      </tr>
+                    ) : (
+                      <tr className="bg-[var(--muted)] border-b border-[var(--border)]">
+                        <td colSpan={6} className="px-6 py-4 text-center">
+                          No campaigns found. Create a campaign to see performance data.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </CardContent>
+        </Card>
       </main>
-
       <Footer />
     </div>
   );

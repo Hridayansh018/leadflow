@@ -5,6 +5,10 @@ import { Phone, X, Clock, Calendar } from 'lucide-react';
 import vapiService from '../services/vapiService';
 import { timezones, getCurrentTimeInTimezone } from '../utils/timezoneUtils';
 import { showSuccess, showError, showWarning } from '../utils/toastUtils';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "./ui/dialog";
+import { Input } from "./ui/input";
+import { Button } from "./ui/button";
+import { Card } from "./ui/card";
 
 interface SingleCallModalProps {
   isOpen: boolean;
@@ -22,6 +26,16 @@ export default function SingleCallModal({ isOpen, onClose, onCallInitiated }: Si
   const [loading, setLoading] = useState(false);
   const [prompt, setPrompt] = useState('');
 
+  const promptTemplate = `Hi {{customer_name}}, here are some properties you might like:\n{{property_details}}\nWould you like to know more or schedule a tour?`;
+
+  function fillPrompt(template: string, variables: Record<string, string>) {
+    let result = template;
+    Object.entries(variables).forEach(([key, value]) => {
+      result = result.replace(new RegExp(`{{${key}}}`, 'g'), value);
+    });
+    return result;
+  }
+
   const handleMakeCall = async () => {
     if (!customerName.trim() || !customerPhone.trim()) {
       showWarning('Please enter both customer name and phone number.');
@@ -30,6 +44,11 @@ export default function SingleCallModal({ isOpen, onClose, onCallInitiated }: Si
 
     try {
       setLoading(true);
+
+      const finalPrompt = fillPrompt(promptTemplate, {
+        property_details: prompt,
+        customer_name: customerName
+      });
 
       const callRequest = {
         customer: {
@@ -40,9 +59,9 @@ export default function SingleCallModal({ isOpen, onClose, onCallInitiated }: Si
         phoneNumberId: process.env.NEXT_PUBLIC_PHONE_NUMBER_ID!,
         metadata: {
           customerEmail: customerEmail,
-          type: 'single',
-          property_details: prompt // <-- send property details as metadata
-        }
+          type: 'single'
+        },
+        prompt: finalPrompt // send the substituted prompt
       };
 
       let callResponse;
@@ -83,83 +102,53 @@ export default function SingleCallModal({ isOpen, onClose, onCallInitiated }: Si
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-white flex items-center">
-            <Phone className="h-5 w-5 mr-2" />
-            Make Single Call
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white"
-          >
-            <X className="h-6 w-6" />
-          </button>
-        </div>
-
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-md bg-[var(--card)] text-[var(--card-foreground)]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Phone className="h-5 w-5" /> Make Single Call
+          </DialogTitle>
+        </DialogHeader>
         <div className="space-y-4">
-          {/* Customer Name */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
-              Customer Name *
-            </label>
-            <input
+            <label className="block text-sm font-medium mb-1">Customer Name *</label>
+            <Input
               type="text"
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Enter customer name"
             />
           </div>
-
-          {/* Phone Number */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
-              Phone Number *
-            </label>
-            <input
+            <label className="block text-sm font-medium mb-1">Phone Number *</label>
+            <Input
               type="tel"
               value={customerPhone}
               onChange={(e) => setCustomerPhone(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Enter phone number"
             />
           </div>
-
-          {/* Email */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
-              Email (Optional)
-            </label>
-            <input
+            <label className="block text-sm font-medium mb-1">Email (Optional)</label>
+            <Input
               type="email"
               value={customerEmail}
               onChange={(e) => setCustomerEmail(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Enter email address"
             />
           </div>
-
-          {/* Call Script or Property Details */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
-              Call Script or Property Details (AI will say this)
-            </label>
+            <label className="block text-sm font-medium mb-1">Property Details (will be inserted into the call script)</label>
             <textarea
               value={prompt}
               onChange={e => setPrompt(e.target.value)}
               rows={3}
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter property details or script for the call"
+              className="w-full px-3 py-2 rounded-md border border-[var(--border)] bg-[var(--input)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+              placeholder="Enter property details for the call"
             />
           </div>
-
-          {/* Schedule Options */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Schedule
-            </label>
+            <label className="block text-sm font-medium mb-2">Schedule</label>
             <div className="flex space-x-4">
               <label className="flex items-center">
                 <input
@@ -169,7 +158,7 @@ export default function SingleCallModal({ isOpen, onClose, onCallInitiated }: Si
                   onChange={(e) => setCallSchedule(e.target.value as 'now' | 'schedule')}
                   className="mr-2"
                 />
-                <span className="text-gray-300">Call Now</span>
+                <span>Call Now</span>
               </label>
               <label className="flex items-center">
                 <input
@@ -179,33 +168,26 @@ export default function SingleCallModal({ isOpen, onClose, onCallInitiated }: Si
                   onChange={(e) => setCallSchedule(e.target.value as 'now' | 'schedule')}
                   className="mr-2"
                 />
-                <span className="text-gray-300">Schedule</span>
+                <span>Schedule</span>
               </label>
             </div>
           </div>
-
-          {/* Scheduled Time */}
           {callSchedule === 'schedule' && (
             <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Scheduled Time
-                </label>
-                <input
+                <label className="block text-sm font-medium mb-1">Scheduled Time</label>
+                <Input
                   type="datetime-local"
                   value={scheduledTime}
                   onChange={(e) => setScheduledTime(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Timezone
-                </label>
+                <label className="block text-sm font-medium mb-1">Timezone</label>
                 <select
                   value={timezone}
                   onChange={(e) => setTimezone(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 rounded-md border border-[var(--border)] bg-[var(--input)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                 >
                   {timezones.map((tz) => (
                     <option key={tz.value} value={tz.value}>
@@ -217,25 +199,17 @@ export default function SingleCallModal({ isOpen, onClose, onCallInitiated }: Si
             </div>
           )}
         </div>
-
-        {/* Actions */}
-        <div className="flex justify-end space-x-3 mt-6">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
+        <DialogFooter className="flex justify-end space-x-3 mt-6">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button
             onClick={handleMakeCall}
             disabled={loading || !customerName.trim() || !customerPhone.trim()}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
           >
             <Phone className="h-4 w-4 mr-2" />
             {loading ? 'Initiating...' : callSchedule === 'now' ? 'Call Now' : 'Schedule Call'}
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 } 

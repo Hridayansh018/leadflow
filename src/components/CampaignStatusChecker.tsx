@@ -47,7 +47,7 @@ export default function CampaignStatusChecker() {
   const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null);
   const [campaignDetails, setCampaignDetails] = useState<{
     campaign: VAPICampaignResponse;
-    callStatuses: CallStatus[];
+    callDetails: CallStatus[];
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
@@ -83,17 +83,17 @@ export default function CampaignStatusChecker() {
           try {
             // Get detailed campaign information
             const campaignDetails = await vapiService.getCampaignDetails(campaign.id);
-            const callStatuses = campaignDetails.callStatuses;
+            const callDetails = campaignDetails.callDetails;
             
             // Calculate real call statistics
-            const callsCompleted = callStatuses.filter(call => 
+            const callsCompleted = callDetails.filter(call => 
               ['answered', 'unanswered', 'failed'].includes(call.status)
             ).length;
-            const callsInProgress = callStatuses.filter(call => 
+            const callsInProgress = callDetails.filter(call => 
               call.status === 'in-progress'
             ).length;
             const callsScheduled = campaign.leads.length;
-            const callsFailed = callStatuses.filter(call => 
+            const callsFailed = callDetails.filter(call => 
               call.status === 'failed'
             ).length;
             const completionRate = callsScheduled > 0 ? (callsCompleted / callsScheduled) * 100 : 0;
@@ -366,7 +366,7 @@ export default function CampaignStatusChecker() {
                   </div>
                   <div>
                     <p className="text-gray-600">Total Calls</p>
-                    <p className="font-medium">{campaignDetails.callStatuses.length}</p>
+                    <p className="font-medium">{campaignDetails.callDetails.length}</p>
                   </div>
                   <div>
                     <p className="text-gray-600">Created</p>
@@ -383,10 +383,10 @@ export default function CampaignStatusChecker() {
               <div>
                 <h6 className="font-medium text-gray-900 mb-3">Call Statuses</h6>
                 <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {campaignDetails.callStatuses.length === 0 ? (
+                  {campaignDetails.callDetails.length === 0 ? (
                     <p className="text-gray-500 text-sm">No calls found for this campaign</p>
                   ) : (
-                    campaignDetails.callStatuses.map((call) => (
+                    campaignDetails.callDetails.map((call) => (
                       <div key={call.callId} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                         <div className="flex-1">
                           <p className="font-medium text-gray-900">{call.customerName}</p>

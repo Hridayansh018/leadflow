@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Play, Upload, Plus, Trash2, Phone, Users, BarChart3, Calendar, Pause, CheckCircle, Clock } from 'lucide-react';
+import { Play, BarChart3, Pause, CheckCircle } from 'lucide-react';
 import Header from '../../components/Header';
 import Footer from '../../components/Footer';
 import { useData } from '../context/DataContext';
@@ -10,14 +10,13 @@ import dashboardService, { DashboardMetrics } from '../../services/dashboardServ
 import { showSuccess, showError, showWarning, showInfo, showConfirmation } from '../../utils/toastUtils';
 
 import leadService from '../../services/leadService';
-import { timezones, getCurrentTimeInTimezone } from '../../utils/timezoneUtils';
 
-import PropertyFileManager from '../../components/PropertyFileManager';
 import CallHistoryTable from '../../components/CallHistoryTable';
-import CampaignHistoryTable from '../../components/CampaignHistoryTable';
 
 import CampaignManager from '../../components/CampaignManager';
-import AdvancedAnalytics from '../../components/AdvancedAnalytics';
+import { Card, CardHeader, CardTitle, CardContent } from "../../components/ui/card";
+import { Button } from "../../components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../components/ui/tabs";
 
 interface DashboardPageProps {
   onNavigate: (route: string) => void;
@@ -88,8 +87,8 @@ export default function DashboardPage({ onNavigate }: DashboardPageProps) {
       
       const message = `Campaign: ${details.campaign.name}\n` +
         `Status: ${details.campaign.status}\n` +
-        `Total Calls: ${details.callStatuses.length}\n` +
-        `Call Statuses:\n${details.callStatuses.map(call => 
+        `Total Calls: ${details.callDetails.length}\n` +
+        `Call Statuses:\n${details.callDetails.map(call => 
           `- ${call.customerName} (${call.phoneNumber}): ${call.status}`
         ).join('\n')}`;
       
@@ -104,7 +103,7 @@ export default function DashboardPage({ onNavigate }: DashboardPageProps) {
   const loadCampaignCallHistory = async (campaignId: string) => {
     try {
       const details = await vapiService.getCampaignDetails(campaignId);
-      setCampaignCallHistory(details.callStatuses);
+      setCampaignCallHistory(details.callDetails);
     } catch (error) {
       console.error('Error loading campaign call history:', error);
       setCampaignCallHistory([]);
@@ -380,495 +379,132 @@ export default function DashboardPage({ onNavigate }: DashboardPageProps) {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
       <Header onNavigate={onNavigate} currentRoute="dashboard" />
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {loadingStats ? (
-            Array(4).fill(0).map((_, idx) => (
-              <div key={idx} className="bg-gray-800 p-6 rounded-lg border border-gray-700 animate-pulse h-28" />
-            ))
-          ) : (
-            stats.map((stat) => {
-              const Icon = stat.icon;
-              return (
-                <div key={stat.name} className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-                  <div className="flex items-center">
-                    <div className={`p-3 rounded-lg ${stat.color}`}>
-                      <Icon className="h-6 w-6 text-white" />
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-300">{stat.name}</p>
-                      <p className="text-2xl font-bold text-white">{stat.value}</p>
-                    </div>
-                  </div>
+        <Tabs defaultValue={activeTab} className="w-full">
+          <TabsList className="mb-6">
+            <TabsTrigger value="dashboard" onClick={() => setActiveTab('dashboard')}>Dashboard</TabsTrigger>
+            <TabsTrigger value="calls" onClick={() => setActiveTab('calls')}>Calls</TabsTrigger>
+            <TabsTrigger value="campaigns" onClick={() => setActiveTab('campaigns')}>Campaigns</TabsTrigger>          </TabsList>
+          <TabsContent value="dashboard">
+            <Card className="mb-8 bg-[var(--card)] text-[var(--card-foreground)]">
+              <CardHeader>
+                <CardTitle>Dashboard Overview</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {/* Dashboard Stats */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                  {stats.map((stat) => {
+                    const Icon = stat.icon;
+                    return (
+                      <Card key={stat.name} className="flex flex-col items-center justify-center p-6 bg-[var(--muted)] text-[var(--foreground)] border-[var(--border)]">
+                        <Icon className="h-8 w-8 mb-2" />
+                        <div className="text-lg font-semibold">{stat.value}</div>
+                        <div className="text-sm text-[var(--muted-foreground)]">{stat.name}</div>
+                      </Card>
+                    );
+                  })}
                 </div>
-              );
-            })
-          )}
-        </div>
-
-        {/* VAPI Configuration Status */}
-        {!isVapiConfigured && (
-          <div className="mb-8 bg-red-900 border border-red-700 rounded-lg p-4">
-            <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-200">
-                    VAPI Not Configured
-                </h3>
-                <div className="mt-2 text-sm text-red-300">
-                  <p>{vapiConfig.message}</p>
+                {/* Quick Actions */}
+                <div className="flex flex-wrap gap-4 mb-8">
+                  <Button onClick={testVAPIConnection} variant="secondary">Test VAPI Connection</Button>
+                  <Button onClick={checkCampaignDetails} variant="secondary">Check Campaign Details</Button>
+                  <Button onClick={refreshDashboard} variant="outline">Refresh Dashboard</Button>
                 </div>
-                </div>
-              </div>
-              <div className="flex space-x-2">
-                <button
-                  onClick={testVAPIConnection}
-                  className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
-                >
-                  Test Connection
-                </button>
-                <button
-                  onClick={checkCampaignDetails}
-                  className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
-                >
-                  Check Campaign Details
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {isVapiConfigured && (
-          <div className="mb-8 bg-green-900 border border-green-700 rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-green-200">
-                    VAPI Ready
-                  </h3>
-                  <div className="mt-2 text-sm text-green-300">
-                    <p>{vapiConfig.message}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="flex space-x-2">
-                <button
-                  onClick={testVAPIConnection}
-                  className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
-                >
-                  Test Connection
-                </button>
-                <button
-                  onClick={checkCampaignDetails}
-                  className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
-                >
-                  Check Campaign Details
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Tab Navigation */}
-        <div className="mb-6 flex items-center justify-between">
-          <nav className="flex space-x-8">
-            <button
-              onClick={() => setActiveTab('dashboard')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'dashboard'
-                  ? 'border-blue-500 text-blue-400'
-                  : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
-              }`}
-            >
-              Dashboard
-            </button>
-            <button
-              onClick={() => setActiveTab('calls')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'calls'
-                  ? 'border-blue-500 text-blue-400'
-                  : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
-              }`}
-            >
-              Call History
-            </button>
-            <button
-              onClick={() => setActiveTab('campaigns')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'campaigns'
-                  ? 'border-blue-500 text-blue-400'
-                  : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
-              }`}
-            >
-              Campaign History
-            </button>
-            <button
-              onClick={() => setActiveTab('analytics')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'analytics'
-                  ? 'border-blue-500 text-blue-400'
-                  : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
-              }`}
-            >
-              Analytics
-            </button>
-          </nav>
-          {activeTab === 'dashboard' && (
-            <button
-              onClick={refreshDashboard}
-              disabled={loadingMetrics}
-              className="bg-gray-600 hover:bg-gray-700 disabled:bg-gray-800 text-white px-3 py-2 rounded-md font-medium transition-colors flex items-center text-sm"
-            >
-              <svg className={`h-4 w-4 mr-2 ${loadingMetrics ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Refresh Data
-            </button>
-          )}
-        </div>
-
-        {/* Tab Content */}
-        {activeTab === 'dashboard' && (
-          <div className="space-y-6">
-            {/* Key Metrics Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {loadingMetrics ? (
-                Array(4).fill(0).map((_, idx) => (
-                  <div key={idx} className="bg-gray-800 p-6 rounded-lg border border-gray-700 animate-pulse h-28" />
-                ))
-              ) : (
-                <>
-              <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-                    <div className="flex items-center">
-                      <div className="p-3 rounded-lg bg-blue-500">
-                        <Users className="h-6 w-6 text-white" />
-              </div>
-                      <div className="ml-4">
-                        <p className="text-sm font-medium text-gray-300">Total Leads</p>
-                        <p className="text-2xl font-bold text-white">{dashboardMetrics?.totalLeads || 0}</p>
-                        <p className="text-xs text-green-400">Real-time data</p>
-                </div>
-              </div>
-            </div>
-            
-                  <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-                    <div className="flex items-center">
-                      <div className="p-3 rounded-lg bg-green-500">
-                        <Phone className="h-6 w-6 text-white" />
-                </div>
-                      <div className="ml-4">
-                        <p className="text-sm font-medium text-gray-300">Calls Today</p>
-                        <p className="text-2xl font-bold text-white">{dashboardMetrics?.callsToday || 0}</p>
-                        <p className="text-xs text-green-400">From VAPI</p>
-              </div>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-                    <div className="flex items-center">
-                      <div className="p-3 rounded-lg bg-purple-500">
-                        <BarChart3 className="h-6 w-6 text-white" />
-                    </div>
-                      <div className="ml-4">
-                        <p className="text-sm font-medium text-gray-300">Conversion Rate</p>
-                        <p className="text-2xl font-bold text-white">{dashboardMetrics?.conversionRate || 0}%</p>
-                        <p className="text-xs text-green-400">Calculated from leads</p>
-                  </div>
+                {/* Dashboard Metrics Widget */}
+                {dashboardMetrics && (
+                  <Card className="mb-8 bg-[var(--muted)] text-[var(--foreground)] border-[var(--border)]">
+                    <CardHeader>
+                      <CardTitle>Key Metrics</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div>
+                          <div className="text-2xl font-bold">{dashboardMetrics.totalLeads}</div>
+                          <div className="text-sm text-[var(--muted-foreground)]">Total Leads</div>
                         </div>
+                        <div>
+                          <div className="text-2xl font-bold">{dashboardMetrics.callsToday}</div>
+                          <div className="text-sm text-[var(--muted-foreground)]">Calls Today</div>
                         </div>
-
-                  <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-                    <div className="flex items-center">
-                      <div className="p-3 rounded-lg bg-orange-500">
-                        <Calendar className="h-6 w-6 text-white" />
-                      </div>
-                      <div className="ml-4">
-                        <p className="text-sm font-medium text-gray-300">Active Campaigns</p>
-                        <p className="text-2xl font-bold text-white">{dashboardMetrics?.activeCampaigns || 0}</p>
-                        <p className="text-xs text-blue-400">From VAPI</p>
+                        <div>
+                          <div className="text-2xl font-bold">{dashboardMetrics.activeCampaigns}</div>
+                          <div className="text-sm text-[var(--muted-foreground)]">Active Campaigns</div>
                         </div>
-                    </div>
-                      </div>
-                </>
-              )}
-            </div>
-
-            {/* Quick Actions */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
-                  <Plus className="h-5 w-5 mr-2" />
-                  Quick Actions
-                </h3>
-                <div className="space-y-3">
-            <button
-                    onClick={() => onNavigate('leads')}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-md font-medium transition-colors flex items-center justify-center"
-                  >
-                    <Users className="h-4 w-4 mr-2" />
-                    Add New Lead
-            </button>
-                    <button
-                    onClick={() => setActiveTab('calls')}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white py-3 px-4 rounded-md font-medium transition-colors flex items-center justify-center"
-                  >
-                    <Phone className="h-4 w-4 mr-2" />
-                    Make Single Call
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('campaigns')}
-                    className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 px-4 rounded-md font-medium transition-colors flex items-center justify-center"
-                    >
-                    <BarChart3 className="h-4 w-4 mr-2" />
-                    Create Campaign
-                    </button>
-                  </div>
-                </div>
-
-              <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
-                  <Clock className="h-5 w-5 mr-2" />
-                  Recent Activity
-                </h3>
-                <div className="space-y-3">
-                  {loadingMetrics ? (
-                    Array(4).fill(0).map((_, idx) => (
-                      <div key={idx} className="p-3 bg-gray-700 rounded-md animate-pulse h-16" />
-                    ))
-                  ) : dashboardMetrics?.recentActivity && dashboardMetrics.recentActivity.length > 0 ? (
-                    dashboardMetrics.recentActivity.slice(0, 4).map((activity, index) => (
-                      <div key={activity.id || index} className="flex items-center space-x-3 p-3 bg-gray-700 rounded-md">
-                        <div className={`w-2 h-2 rounded-full ${
-                          activity.type === 'call' ? 'bg-green-400' :
-                          activity.type === 'lead' ? 'bg-blue-400' :
-                          activity.type === 'campaign' ? 'bg-purple-400' :
-                          'bg-orange-400'
-                        }`}></div>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-white">{activity.title}</p>
-                          <p className="text-xs text-gray-400">
-                            {new Date(activity.timestamp).toLocaleString()}
-                          </p>
+                        <div>
+                          <div className="text-2xl font-bold">{dashboardMetrics.conversionRate}%</div>
+                          <div className="text-sm text-[var(--muted-foreground)]">Conversion Rate</div>
+                        </div>
+                        <div>
+                          <div className="text-2xl font-bold">{dashboardMetrics.performanceMetrics.callSuccessRate}%</div>
+                          <div className="text-sm text-[var(--muted-foreground)]">Call Success Rate</div>
+                        </div>
+                        <div>
+                          <div className="text-2xl font-bold">{dashboardMetrics.performanceMetrics.leadResponseRate}%</div>
+                          <div className="text-sm text-[var(--muted-foreground)]">Lead Response Rate</div>
                         </div>
                       </div>
-                    ))
-                  ) : (
-                    <div className="text-center text-gray-400 py-4">
-                      <p className="text-sm">No recent activity</p>
-                    </div>
-                  )}
-            </div>
-          </div>
-
-          <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
-                  <BarChart3 className="h-5 w-5 mr-2" />
-                  Performance Summary
-                </h3>
-                <div className="space-y-4">
-              <div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-300">Call Success Rate</span>
-                      <span className="text-white font-medium">{dashboardMetrics?.performanceMetrics.callSuccessRate || 0}%</span>
-              </div>
-                    <div className="w-full bg-gray-700 rounded-full h-2 mt-1">
-                      <div className="bg-green-500 h-2 rounded-full" style={{width: `${dashboardMetrics?.performanceMetrics.callSuccessRate || 0}%`}}></div>
-              </div>
-                  </div>
-              <div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-300">Lead Response Rate</span>
-                      <span className="text-white font-medium">{dashboardMetrics?.performanceMetrics.leadResponseRate || 0}%</span>
-              </div>
-                    <div className="w-full bg-gray-700 rounded-full h-2 mt-1">
-                      <div className="bg-blue-500 h-2 rounded-full" style={{width: `${dashboardMetrics?.performanceMetrics.leadResponseRate || 0}%`}}></div>
-                    </div>
-                  </div>
-              <div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-300">Conversion Rate</span>
-                      <span className="text-white font-medium">{dashboardMetrics?.performanceMetrics.conversionRate || 0}%</span>
-                    </div>
-                    <div className="w-full bg-gray-700 rounded-full h-2 mt-1">
-                      <div className="bg-purple-500 h-2 rounded-full" style={{width: `${dashboardMetrics?.performanceMetrics.conversionRate || 0}%`}}></div>
-                    </div>
-                  </div>
-                </div>
-                </div>
-              </div>
-
-            {/* Lead Status Overview */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-                <h3 className="text-lg font-semibold text-white mb-4">Lead Status Distribution</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <div className="w-3 h-3 bg-blue-500 rounded-full mr-3"></div>
-                      <span className="text-gray-300">New Leads</span>
-                    </div>
-                    <span className="text-white font-medium">{dashboardMetrics?.leadStatusDistribution.new || 0}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <div className="w-3 h-3 bg-yellow-500 rounded-full mr-3"></div>
-                      <span className="text-gray-300">Contacted</span>
-                    </div>
-                    <span className="text-white font-medium">{dashboardMetrics?.leadStatusDistribution.contacted || 0}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <div className="w-3 h-3 bg-purple-500 rounded-full mr-3"></div>
-                      <span className="text-gray-300">Qualified</span>
-                        </div>
-                    <span className="text-white font-medium">{dashboardMetrics?.leadStatusDistribution.qualified || 0}</span>
-                        </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
-                      <span className="text-gray-300">Converted</span>
+                    </CardContent>
+                  </Card>
+                )}
+                {/* Scheduled Calls Widget */}
+                <Card className="mb-8 bg-[var(--muted)] text-[var(--foreground)] border-[var(--border)]">
+                  <CardHeader>
+                    <CardTitle>Scheduled Calls</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {scheduledCalls.length === 0 ? (
+                      <div className="text-[var(--muted-foreground)]">No scheduled calls.</div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className="bg-[var(--muted)]">
+                            <tr>
+                              <th className="px-4 py-2 text-left">Customer</th>
+                              <th className="px-4 py-2 text-left">Scheduled Time</th>
+                              <th className="px-4 py-2 text-left">Status</th>
+                              <th className="px-4 py-2 text-left">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {scheduledCalls.map((call) => (
+                              <tr key={call.id} className="border-b border-[var(--border)]">
+                                <td className="px-4 py-2">{call.request.customer.name || call.request.customer.number}</td>
+                                <td className="px-4 py-2">{call.scheduledTime}</td>
+                                <td className="px-4 py-2">{call.status}</td>
+                                <td className="px-4 py-2">
+                                  <Button size="sm" variant="destructive" onClick={() => handleCancelScheduledCall(call.id)}>
+                                    Cancel
+                                  </Button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
-                    <span className="text-white font-medium">{dashboardMetrics?.leadStatusDistribution.converted || 0}</span>
-                        </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <div className="w-3 h-3 bg-red-500 rounded-full mr-3"></div>
-                      <span className="text-gray-300">Lost</span>
-                    </div>
-                    <span className="text-white font-medium">{dashboardMetrics?.leadStatusDistribution.lost || 0}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-                <h3 className="text-lg font-semibold text-white mb-4">Today's Schedule</h3>
-                <div className="space-y-3">
-                  {loadingMetrics ? (
-                    Array(3).fill(0).map((_, idx) => (
-                      <div key={idx} className="p-3 bg-gray-700 rounded-md animate-pulse h-16" />
-                    ))
-                  ) : dashboardMetrics?.todaysSchedule && dashboardMetrics.todaysSchedule.length > 0 ? (
-                    dashboardMetrics.todaysSchedule.slice(0, 3).map((schedule, index) => (
-                      <div key={schedule.id || index} className="flex items-center justify-between p-3 bg-gray-700 rounded-md">
-                    <div>
-                          <p className="text-sm font-medium text-white">{schedule.title}</p>
-                          <p className="text-xs text-gray-400">{schedule.contact} - {schedule.time}</p>
-                      </div>
-                        <span className={`text-xs text-white px-2 py-1 rounded-full ${
-                          schedule.status === 'scheduled' ? 'bg-blue-500' :
-                          schedule.status === 'confirmed' ? 'bg-green-500' :
-                          'bg-purple-500'
-                        }`}>
-                          {schedule.status}
-                        </span>
-                    </div>
-                    ))
-                  ) : (
-                    <div className="text-center text-gray-400 py-4">
-                      <p className="text-sm">No scheduled activities</p>
-                </div>
-              )}
-                </div>
-              </div>
-            </div>
-            
-            {/* System Status */}
-            <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
-                <CheckCircle className="h-5 w-5 mr-2" />
-                System Status
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className={`flex items-center space-x-3 p-3 rounded-md border ${
-                  dashboardMetrics?.systemStatus.vapi 
-                    ? 'bg-green-900 border-green-700' 
-                    : 'bg-red-900 border-red-700'
-                }`}>
-                  {dashboardMetrics?.systemStatus.vapi ? (
-                    <CheckCircle className="h-5 w-5 text-green-400" />
-                  ) : (
-                    <div className="h-5 w-5 bg-red-400 rounded-full"></div>
-                  )}
-                      <div>
-                    <p className="text-sm font-medium text-white">VAPI Calling</p>
-                    <p className={`text-xs ${
-                      dashboardMetrics?.systemStatus.vapi ? 'text-green-300' : 'text-red-300'
-                    }`}>
-                      {dashboardMetrics?.systemStatus.vapi ? 'Connected & Ready' : 'Not Configured'}
-                        </p>
-                      </div>
-                    </div>
-                <div className={`flex items-center space-x-3 p-3 rounded-md border ${
-                  dashboardMetrics?.systemStatus.database 
-                    ? 'bg-green-900 border-green-700' 
-                    : 'bg-red-900 border-red-700'
-                }`}>
-                  {dashboardMetrics?.systemStatus.database ? (
-                    <CheckCircle className="h-5 w-5 text-green-400" />
-                  ) : (
-                    <div className="h-5 w-5 bg-red-400 rounded-full"></div>
-                  )}
-                  <div>
-                    <p className="text-sm font-medium text-white">Database</p>
-                    <p className={`text-xs ${
-                      dashboardMetrics?.systemStatus.database ? 'text-green-300' : 'text-red-300'
-                    }`}>
-                      {dashboardMetrics?.systemStatus.database ? 'Supabase Connected' : 'Connection Failed'}
-                    </p>
-                  </div>
-                </div>
-          </div>
-        </div>
-          </div>
-        )}
-
-        {/* Call History Tab */}
-        {activeTab === 'calls' && (
-          <div className="space-y-6">
-            <CallHistoryTable />
-          </div>
-        )}
-
-        {/* Campaign History Tab */}
-        {activeTab === 'campaigns' && (
-          <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold text-white mb-4">Campaign Manager</h3>
-                <CampaignManager />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-white mb-4">Advanced Analytics</h3>
-              <AdvancedAnalytics />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-white mb-4">Campaign History</h3>
-              <CampaignHistoryTable />
-            </div>
-          </div>
-        )}
-
-        {/* Analytics Tab */}
-        {activeTab === 'analytics' && (
-          <div className="space-y-6">
-            <AdvancedAnalytics />
-          </div>
-        )}
+                    )}
+                  </CardContent>
+                </Card>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          <TabsContent value="calls">
+            <Card className="mb-8 bg-[var(--card)] text-[var(--card-foreground)]">
+              <CardHeader>
+                <CardTitle>Call History</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CallHistoryTable />
+              </CardContent>
+            </Card>
+          </TabsContent>
+          <TabsContent value="campaigns">
+            <CampaignManager />
+          </TabsContent>
+        </Tabs>
       </main>
-
       <Footer />
     </div>
   );

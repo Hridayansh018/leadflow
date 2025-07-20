@@ -5,6 +5,11 @@ import { Play, Pause, StopCircle, Trash2, Eye, BarChart3, AlertTriangle, Trendin
 import vapiService from '../services/vapiService';
 import CampaignCreator from './CampaignCreator';
 import { showSuccess, showError, showWarning } from '../utils/toastUtils';
+import { Card, CardHeader, CardTitle, CardContent } from "./ui/card";
+import { Button } from "./ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
+import { Input } from "./ui/input";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "./ui/table";
 
 interface Campaign {
   id: string;
@@ -62,6 +67,9 @@ export default function CampaignManager() {
   const [templates] = useState<CampaignTemplate[]>(vapiService.getCampaignTemplates());
   const [selectedTemplate, setSelectedTemplate] = useState<CampaignTemplate | null>(null);
   const [templateVariables, setTemplateVariables] = useState<Record<string, string>>({});
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [selectedCampaignDetails, setSelectedCampaignDetails] = useState<{ campaign: any, callDetails: any[] } | null>(null);
 
 
   useEffect(() => {
@@ -80,7 +88,7 @@ export default function CampaignManager() {
             // Get detailed campaign information
             const campaignDetails = await vapiService.getCampaignDetails(campaign.id);
             const totalLeads = campaign.leads.length;
-            const completedCalls = campaignDetails.callStatuses.filter(
+            const completedCalls = campaignDetails.callDetails.filter(
               call => ['answered', 'unanswered', 'failed'].includes(call.status)
             ).length;
             const completionRate = totalLeads > 0 ? (completedCalls / totalLeads) * 100 : 0;
@@ -200,6 +208,19 @@ export default function CampaignManager() {
     setTemplateVariables(templateVars);
   };
 
+  const handleShowDetails = async (campaignId: string) => {
+    setDetailsOpen(true);
+    setDetailsLoading(true);
+    try {
+      const details = await vapiService.getCampaignDetails(campaignId);
+      setSelectedCampaignDetails(details);
+    } catch (error) {
+      showError('Failed to load campaign call details');
+      setSelectedCampaignDetails(null);
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
 
 
   const getStatusIcon = (status: string) => {
@@ -242,210 +263,237 @@ export default function CampaignManager() {
 
   const renderTemplates = () => {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-gray-800 rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-white">Campaign Templates</h3>
-            <button
-              onClick={() => setShowTemplates(false)}
-              className="text-gray-400 hover:text-white"
-            >
-              ✕
-            </button>
-          </div>
-
+      <Dialog open={showTemplates} onOpenChange={setShowTemplates}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-[var(--card)] text-[var(--card-foreground)]">
+          <DialogHeader>
+            <DialogTitle>Campaign Templates</DialogTitle>
+          </DialogHeader>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {templates.map((template) => (
-                <div
-                  key={template.id}
-                className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                    selectedTemplate?.id === template.id 
-                      ? 'border-blue-500 bg-blue-900 bg-opacity-20' 
-                    : 'border-gray-600 hover:border-gray-500'
-                  }`}
-                  onClick={() => handleTemplateSelect(template)}
-                >
-                <h4 className="font-medium text-white mb-2">{template.name}</h4>
-                <p className="text-sm text-gray-300 mb-3">{template.description}</p>
+            {templates.map((template) => (
+              <Card
+                key={template.id}
+                className={`p-4 border rounded-lg cursor-pointer transition-colors ${selectedTemplate?.id === template.id ? 'border-[var(--primary)] bg-[var(--primary)]/10' : 'border-[var(--border)] hover:border-[var(--primary)]'}`}
+                onClick={() => handleTemplateSelect(template)}
+              >
+                <h4 className="font-medium text-[var(--foreground)] mb-2">{template.name}</h4>
+                <p className="text-sm text-[var(--muted-foreground)] mb-3">{template.description}</p>
                 <div className="flex flex-wrap gap-1">
                   {template.variables.slice(0, 3).map((variable) => (
                     <span
                       key={variable}
-                      className="px-2 py-1 text-xs bg-gray-600 text-gray-300 rounded"
+                      className="px-2 py-1 text-xs bg-[var(--muted)] text-[var(--muted-foreground)] rounded"
                     >
                       {variable}
                     </span>
                   ))}
                   {template.variables.length > 3 && (
-                    <span className="px-2 py-1 text-xs bg-gray-600 text-gray-300 rounded">
+                    <span className="px-2 py-1 text-xs bg-[var(--muted)] text-[var(--muted-foreground)] rounded">
                       +{template.variables.length - 3} more
-                  </span>
+                    </span>
                   )}
                 </div>
-                </div>
-              ))}
-            </div>
-
-            {selectedTemplate && (
-            <div className="mt-6 bg-gray-700 p-4 rounded-lg border border-gray-600">
-              <h4 className="text-lg font-semibold text-white mb-4">Template Preview</h4>
+              </Card>
+            ))}
+          </div>
+          {selectedTemplate && (
+            <Card className="mt-6 bg-[var(--muted)] p-4 rounded-lg border border-[var(--border)]">
+              <CardHeader>
+                <CardTitle>Template Preview</CardTitle>
+              </CardHeader>
+              <CardContent>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Variables</label>
+                    <label className="block text-sm font-medium mb-2">Variables</label>
                     <div className="grid grid-cols-2 gap-2">
                       {selectedTemplate.variables.map((variable) => (
                         <div key={variable} className="flex flex-col">
-                          <label className="text-xs text-gray-400">{variable}</label>
-                          <input
+                          <label className="text-xs text-[var(--muted-foreground)]">{variable}</label>
+                          <Input
                             type="text"
                             value={templateVariables[variable] || ''}
                             onChange={(e) => setTemplateVariables(prev => ({ ...prev, [variable]: e.target.value }))}
-                          className="px-2 py-1 bg-gray-600 border border-gray-500 rounded text-white text-sm"
+                            className="px-2 py-1"
                           />
                         </div>
                       ))}
                     </div>
                   </div>
-                  
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Processed Prompt</label>
-                  <div className="bg-gray-600 p-3 rounded border border-gray-500">
-                      <p className="text-white text-sm">
+                    <label className="block text-sm font-medium mb-2">Processed Prompt</label>
+                    <div className="bg-[var(--input)] p-3 rounded border border-[var(--border)]">
+                      <p className="text-[var(--foreground)] text-sm">
                         {vapiService.processCampaignTemplate(selectedTemplate.id, templateVariables)}
                       </p>
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
-        </div>
-      </div>
+              </CardContent>
+            </Card>
+          )}
+        </DialogContent>
+      </Dialog>
     );
   };
 
   return (
-    <div className="bg-gray-900 rounded-lg shadow-md p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-semibold text-white">Campaign Manager</h3>
+    <Card className="bg-[var(--card)] text-[var(--card-foreground)] p-6">
+      <CardHeader className="flex items-center justify-between mb-6">
+        <CardTitle>Campaign Manager</CardTitle>
         <div className="flex space-x-2">
           <CampaignCreator />
-          <button
-            onClick={() => setShowTemplates(true)}
-            className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
-          >
+          <Button onClick={() => setShowTemplates(true)} variant="secondary" className="flex items-center">
             <FileText className="h-4 w-4 mr-2 inline" />
             Templates
-          </button>
-          <button
-            onClick={loadCampaigns}
-            disabled={loading}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
-          >
+          </Button>
+          <Button onClick={loadCampaigns} disabled={loading} variant="outline">
             {loading ? 'Loading...' : 'Refresh'}
-          </button>
+          </Button>
         </div>
-      </div>
-
-
-
-      {campaigns.length === 0 ? (
-        <div className="text-center py-8">
-          <BarChart3 className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-          <p className="text-gray-300">No campaigns found</p>
-          <p className="text-sm text-gray-400 mt-2">Create a campaign to get started</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {campaigns.map((campaign) => (
-            <div
-              key={campaign.id}
-              className={`border rounded-lg p-4 transition-colors ${
-                selectedCampaign === campaign.id
-                  ? 'border-blue-500 bg-blue-900 bg-opacity-20'
-                  : 'border-gray-700 hover:border-gray-600'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center space-x-3">
-                  {getStatusIcon(campaign.status)}
-                  <div>
-                    <h4 className="font-medium text-white">{campaign.name}</h4>
-                    <p className="text-sm text-gray-400">Created {formatDate(campaign.createdAt)}</p>
+      </CardHeader>
+      <CardContent>
+        {campaigns.length === 0 ? (
+          <div className="text-center py-8">
+            <BarChart3 className="h-12 w-12 mx-auto mb-4 text-[var(--muted-foreground)]" />
+            <p className="text-[var(--muted-foreground)]">No campaigns found</p>
+            <p className="text-sm text-[var(--muted-foreground)] mt-2">Create a campaign to get started</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {campaigns.map((campaign) => (
+              <Card
+                key={campaign.id}
+                className={`border rounded-lg p-4 transition-colors ${selectedCampaign === campaign.id ? 'border-[var(--primary)] bg-[var(--primary)]/10' : 'border-[var(--border)] hover:border-[var(--primary)]'}`}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-3">
+                    {getStatusIcon(campaign.status)}
+                    <div>
+                      <h4 className="font-medium text-[var(--foreground)]">{campaign.name}</h4>
+                      <p className="text-sm text-[var(--muted-foreground)]">Created {formatDate(campaign.createdAt)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(campaign.status)}`}>
+                      {campaign.status}
+                    </span>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(campaign.status)}`}>
-                    {campaign.status}
-                  </span>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-[var(--foreground)]">{campaign.leadsCount}</div>
+                    <div className="text-sm text-[var(--muted-foreground)]">Leads</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-[var(--primary)]">{campaign.completionRate}%</div>
+                    <div className="text-sm text-[var(--muted-foreground)]">Completion</div>
+                  </div>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-white">{campaign.leadsCount}</div>
-                  <div className="text-sm text-gray-400">Leads</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-400">{campaign.completionRate}%</div>
-                  <div className="text-sm text-gray-400">Completion</div>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {canPause(campaign.status) && (
-                  <button
-                    onClick={() => handleCampaignAction(campaign.id, 'pause')}
-                    disabled={actionLoading === campaign.id}
-                    className="px-3 py-1 text-sm bg-yellow-600 text-white rounded hover:bg-yellow-700 transition-colors disabled:opacity-50 flex items-center"
+                <div className="flex flex-wrap gap-2">
+                  {canPause(campaign.status) && (
+                    <Button
+                      onClick={() => handleCampaignAction(campaign.id, 'pause')}
+                      disabled={actionLoading === campaign.id}
+                      variant="secondary"
+                      className="flex items-center"
+                    >
+                      <Pause className="h-3 w-3 mr-1" />
+                      Pause
+                    </Button>
+                  )}
+                  {canStop(campaign.status) && (
+                    <Button
+                      onClick={() => handleCampaignAction(campaign.id, 'stop')}
+                      disabled={actionLoading === campaign.id}
+                      variant="destructive"
+                      className="flex items-center"
+                    >
+                      <StopCircle className="h-3 w-3 mr-1" />
+                      Stop
+                    </Button>
+                  )}
+                  {canDelete(campaign.status) && (
+                    <Button
+                      onClick={() => handleCampaignAction(campaign.id, 'delete')}
+                      disabled={actionLoading === campaign.id}
+                      variant="outline"
+                      className="flex items-center"
+                    >
+                      <Trash2 className="h-3 w-3 mr-1" />
+                      Delete
+                    </Button>
+                  )}
+                  <Button
+                    onClick={() => { setSelectedCampaign(campaign.id); handleShowDetails(campaign.id); }}
+                    variant="secondary"
+                    className="flex items-center"
                   >
-                    <Pause className="h-3 w-3 mr-1" />
-                    Pause
-                  </button>
-                )}
-                
-                {canStop(campaign.status) && (
-                  <button
-                    onClick={() => handleCampaignAction(campaign.id, 'stop')}
-                    disabled={actionLoading === campaign.id}
-                    className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center"
-                  >
-                    <StopCircle className="h-3 w-3 mr-1" />
-                    Stop
-                  </button>
-                )}
-                
-                {canDelete(campaign.status) && (
-                  <button
-                    onClick={() => handleCampaignAction(campaign.id, 'delete')}
-                    disabled={actionLoading === campaign.id}
-                    className="px-3 py-1 text-sm bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors disabled:opacity-50 flex items-center"
-                  >
-                    <Trash2 className="h-3 w-3 mr-1" />
-                    Delete
-                  </button>
-                )}
-                
-                <button
-                  onClick={() => setSelectedCampaign(campaign.id)}
-                  className="px-3 py-1 text-sm bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors flex items-center"
-                >
-                  <Eye className="h-3 w-3 mr-1" />
-                  Details
-                </button>
-              </div>
-
-              {actionLoading === campaign.id && (
-                <div className="mt-2 text-sm text-gray-400">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 inline mr-2"></div>
-                  Processing...
+                    <Eye className="h-3 w-3 mr-1" />
+                    Details
+                  </Button>
                 </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {showTemplates && renderTemplates()}
-    </div>
+                {actionLoading === campaign.id && (
+                  <div className="mt-2 text-sm text-[var(--muted-foreground)]">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[var(--primary)] inline mr-2"></div>
+                    Processing...
+                  </div>
+                )}
+              </Card>
+            ))}
+          </div>
+        )}
+        {showTemplates && renderTemplates()}
+        {/* Campaign Details Dialog */}
+        <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+          <DialogContent className="min-w-[70vw] min-h-[25vh] overflow-y-auto bg-[var(--card)] text-[var(--card-foreground)]">
+            <DialogHeader>
+              <DialogTitle>Campaign Call Details</DialogTitle>
+            </DialogHeader>
+            {detailsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary)]"></div>
+                <span className="ml-2 text-[var(--muted-foreground)]">Loading call details...</span>
+              </div>
+            ) : selectedCampaignDetails ? (
+              <div>
+                <div className="mb-4">
+                  <div className="font-semibold">Campaign: {selectedCampaignDetails.campaign.name}</div>
+                  <div className="text-sm text-[var(--muted-foreground)]">Created: {formatDate(selectedCampaignDetails.campaign.createdAt)}</div>
+                </div>
+                {selectedCampaignDetails.callDetails.length === 0 ? (
+                  <div className="text-[var(--muted-foreground)]">
+                    No calls have been made for this campaign yet.
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Customer</TableHead>
+                        <TableHead>Phone</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Duration</TableHead>
+                        <TableHead>Created At</TableHead>
+                        <TableHead>Ended Reason</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {selectedCampaignDetails.callDetails.map((call, idx) => (
+                        <TableRow key={call.callId || call.id || `${call.phoneNumber}-${call.createdAt}` || idx}>
+                          <TableCell>{call.customerName || '-'}</TableCell>
+                          <TableCell>{call.phoneNumber || '-'}</TableCell>
+                          <TableCell>{call.status || '-'}</TableCell>
+                          <TableCell>{call.duration || '-'}</TableCell>
+                          <TableCell>{call.createdAt && !isNaN(Date.parse(call.createdAt)) ? new Date(call.createdAt).toLocaleString() : '-'}</TableCell>
+                          <TableCell>{call.endedReason || '-'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </div>
+            ) : null}
+          </DialogContent>
+        </Dialog>
+      </CardContent>
+    </Card>
   );
 } 

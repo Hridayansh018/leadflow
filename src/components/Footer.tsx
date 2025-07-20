@@ -1,5 +1,6 @@
 import React from 'react';
 import { MessageSquare, Phone, Mail } from 'lucide-react';
+import { Button } from "./ui/button";
 
 export default function Footer() {
   const handleContactDeveloper = () => {
@@ -16,13 +17,14 @@ export default function Footer() {
           </div>
           
           <div className="flex items-center space-x-6">
-            <button
+            <Button
               onClick={handleContactDeveloper}
-              className="flex items-center text-gray-300 hover:text-white transition-colors"
+              variant="outline"
+              className="flex items-center"
             >
               <MessageSquare className="h-4 w-4 mr-2" />
               Contact Developer
-            </button>
+            </Button>
             <div className="flex items-center text-gray-300">
               <Mail className="h-4 w-4 mr-2" />
               support@aicrm.com
