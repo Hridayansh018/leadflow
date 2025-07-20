@@ -9,10 +9,7 @@ interface VAPICallRequest {
     name?: string;
     info?: string;
   };
-  metadata?: {
-    campaignId?: string;
-    customerInfo?: string;
-  };
+  metadata?: Record<string, unknown>; // Allow arbitrary metadata fields
 }
 
 interface VAPIScheduleCallRequest extends VAPICallRequest {
@@ -288,27 +285,16 @@ class VAPIService {
   }
 
   // Make a single call
-  async makeCall(request: VAPICallRequest & { user_id?: string }): Promise<VAPICallResponse> {
+  async makeCall(request: VAPICallRequest & { user_id?: string; prompt?: string }): Promise<VAPICallResponse> {
     try {
       if (!this.apiKey) {
-        console.error('❌ API key is empty when making call');
-        console.error('Current API key value:', this.apiKey);
-        console.error('Environment variable value:', process.env.NEXT_PUBLIC_VAPI_PRIVATE_KEY);
-        
-        // Try reloading environment variables
         this.reloadEnvironmentVariables();
-        
         if (!this.apiKey) {
           throw new Error('VAPI API key not configured. Please set NEXT_PUBLIC_VAPI_PRIVATE_KEY in your .env file and restart the development server');
         }
       }
-
-      // Validate and clean phone number
-      let cleanPhoneNumber = request.customer.number.replace(/\s+/g, ''); // Remove spaces
-      
-      // Ensure phone number is in E.164 format
+      let cleanPhoneNumber = request.customer.number.replace(/\s+/g, '');
       if (!cleanPhoneNumber.startsWith('+')) {
-        // If it's a 10-digit number, assume US (+1)
         if (cleanPhoneNumber.length === 10) {
           cleanPhoneNumber = '+1' + cleanPhoneNumber;
         } else if (cleanPhoneNumber.length === 11 && cleanPhoneNumber.startsWith('1')) {
@@ -317,27 +303,14 @@ class VAPIService {
           throw new Error('Phone number must be in E.164 format (e.g., +1234567890) or 10-digit US number');
         }
       }
-
-      // Validate required fields
       if (!request.phoneNumberId || !request.assistantId || !cleanPhoneNumber) {
         throw new Error('Missing required fields: phoneNumberId, assistantId, or customer number');
       }
-
-      console.log('Making VAPI call with request:', {
-        ...request,
-        customer: {
-          ...request.customer,
-          number: cleanPhoneNumber
-        }
-      });
-      console.log('Using API key ending with:', this.apiKey.slice(-4));
-      
-      // Add user_id to metadata
       const metadata = {
         ...(request.metadata || {}),
         ...(request.user_id ? { user_id: request.user_id } : {})
       };
-      const requestPayload = {
+      const requestPayload: any = {
         phoneNumberId: request.phoneNumberId,
         assistantId: request.assistantId,
         customer: {
@@ -346,42 +319,21 @@ class VAPIService {
         },
         ...(Object.keys(metadata).length > 0 && { metadata })
       };
-
-      console.log('Sending request payload:', JSON.stringify(requestPayload, null, 2));
-      
+      // If a prompt is provided (property details or script), include it
+      if (request.prompt) {
+        requestPayload.prompt = request.prompt;
+      }
       const response = await axios.post(
         `${this.baseURL}/call`,
         requestPayload,
-        { 
+        {
           headers: this.getHeaders(),
-          timeout: 30000 // 30 second timeout
+          timeout: 30000
         }
       );
-      
-      console.log('VAPI call response:', response.data);
-      
-      // Save call record to database (commented out - database service not available)
-      // try {
-      //   const callData = response.data as VAPICallResponse;
-      //   await databaseService.createRecord('call', {
-      //     callId: callData.id,
-      //     customerName: request.customer.name || 'Unknown',
-      //     phoneNumber: cleanPhoneNumber,
-      //     status: callData.status || 'initiated',
-      //     duration: '0:00',
-      //     interest: '',
-      //     notes: request.customer.info || '',
-      //     type: 'single'
-      //   });
-      // } catch (dbError) {
-      //   console.error('Error saving call record to database:', dbError);
-      // }
-      
       return response.data as VAPICallResponse;
     } catch (error) {
       console.error('Error making VAPI call:', error);
-      
-      // Enhanced error logging
       if (axios.isAxiosError(error)) {
         console.error('Axios error details:');
         console.error('- Status:', error.response?.status);
@@ -392,7 +344,6 @@ class VAPIService {
         console.error('- Request Headers:', error.config?.headers);
         console.error('- Request Data:', error.config?.data);
       }
-      
       throw error;
     }
   }

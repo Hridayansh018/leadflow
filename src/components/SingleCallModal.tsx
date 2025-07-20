@@ -16,11 +16,11 @@ export default function SingleCallModal({ isOpen, onClose, onCallInitiated }: Si
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
-  const [additionalInfo, setAdditionalInfo] = useState('');
   const [callSchedule, setCallSchedule] = useState<'now' | 'schedule'>('now');
   const [scheduledTime, setScheduledTime] = useState('');
   const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone);
   const [loading, setLoading] = useState(false);
+  const [prompt, setPrompt] = useState('');
 
   const handleMakeCall = async () => {
     if (!customerName.trim() || !customerPhone.trim()) {
@@ -39,9 +39,9 @@ export default function SingleCallModal({ isOpen, onClose, onCallInitiated }: Si
         assistantId: process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID!,
         phoneNumberId: process.env.NEXT_PUBLIC_PHONE_NUMBER_ID!,
         metadata: {
-          customerInfo: additionalInfo,
           customerEmail: customerEmail,
-          type: 'single'
+          type: 'single',
+          property_details: prompt // <-- send property details as metadata
         }
       };
 
@@ -68,7 +68,6 @@ export default function SingleCallModal({ isOpen, onClose, onCallInitiated }: Si
       setCustomerName('');
       setCustomerPhone('');
       setCustomerEmail('');
-      setAdditionalInfo('');
       setScheduledTime('');
       setCallSchedule('now');
       onClose();
@@ -142,17 +141,17 @@ export default function SingleCallModal({ isOpen, onClose, onCallInitiated }: Si
             />
           </div>
 
-          {/* Additional Info */}
+          {/* Call Script or Property Details */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">
-              Additional Information
+              Call Script or Property Details (AI will say this)
             </label>
             <textarea
-              value={additionalInfo}
-              onChange={(e) => setAdditionalInfo(e.target.value)}
+              value={prompt}
+              onChange={e => setPrompt(e.target.value)}
               rows={3}
               className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter any additional information about the customer"
+              placeholder="Enter property details or script for the call"
             />
           </div>
 
