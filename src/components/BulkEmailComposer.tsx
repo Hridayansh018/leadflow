@@ -50,7 +50,7 @@ export default function BulkEmailComposer({ isOpen, onClose }: BulkEmailComposer
     
     // Set default variables
     const defaultVars: Record<string, string> = {
-      recipientName: '{{recipientName}}',
+      customer_name: '{{customer_name}}',
       senderName: fromName,
       propertyName: 'Sample Property',
       propertyAddress: '123 Main St, City, State',

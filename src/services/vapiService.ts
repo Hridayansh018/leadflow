@@ -10,6 +10,12 @@ interface VAPICallRequest {
     info?: string;
   };
   metadata?: Record<string, unknown>; // Allow arbitrary metadata fields
+  assistant?: {
+    firstMessage: string;
+  };
+  assistantOverrides?: {
+    variables?: Record<string, string>;
+  };
 }
 
 interface VAPIScheduleCallRequest extends VAPICallRequest {
@@ -33,6 +39,9 @@ interface VAPICampaignRequest {
   timezone?: string;
   metadata?: Record<string, unknown>;
   property_details?: string; // <-- add property_details
+  assistantOverrides?: {
+    variables?: Record<string, string>;
+  };
 }
 
 // VAPI Campaign Schedule Plan interface
@@ -321,10 +330,19 @@ class VAPIService {
       };
       // If a prompt is provided (property details or script), include it
       if (request.prompt) {
-        requestPayload.prompt = request.prompt;
+        requestPayload.assistant = {
+          firstMessage: request.prompt
+        };
       }
+      // If assistantOverrides is provided, include it
+      if (request.assistantOverrides) {
+        requestPayload.assistantOverrides = request.assistantOverrides;
+      }
+
+      console.log('Request Payload:', JSON.stringify(requestPayload, null, 2));
+
       const response = await axios.post(
-        `${this.baseURL}/call`,
+        `${this.baseURL}/call/phone`,
         requestPayload,
         {
           headers: this.getHeaders(),
@@ -513,7 +531,8 @@ class VAPIService {
         metadata: {
           ...(request.metadata || {}),
           ...(request.property_details ? { property_details: request.property_details } : {})
-        }
+        },
+        ...(request.assistantOverrides && { assistantOverrides: request.assistantOverrides })
       };
 
       console.log('Campaign request (VAPI format):', JSON.stringify(campaignRequest, null, 2));
@@ -611,41 +630,41 @@ class VAPIService {
         id: 'lead-followup',
         name: 'Lead Follow-up',
         description: 'Follow up with leads who have shown interest',
-        prompt: `Hi {{recipientName}}, this is {{senderName}} from {{companyName}}. I'm calling about your recent inquiry regarding {{propertyType}} properties. I wanted to check if you're still in the market and if you'd be interested in viewing some properties that match your criteria. We have some great options available in {{location}} that I think would be perfect for you. Would you be available for a quick chat about your requirements?`,
+        prompt: `Hi {{customer_name}}, this is {{senderName}} from {{companyName}}. I'm calling about your recent inquiry regarding {{propertyType}} properties. I wanted to check if you're still in the market and if you'd be interested in viewing some properties that match your criteria. We have some great options available in {{location}} that I think would be perfect for you. Would you be available for a quick chat about your requirements?`,
         category: 'lead-followup',
-        variables: ['recipientName', 'senderName', 'companyName', 'propertyType', 'location']
+        variables: ['customer_name', 'senderName', 'companyName', 'propertyType', 'location']
       },
       {
         id: 'property-showing',
         name: 'Property Showing Invitation',
         description: 'Invite leads to view specific properties',
-        prompt: `Hi {{recipientName}}, this is {{senderName}} from {{companyName}}. I'm calling about the {{propertyType}} property at {{propertyAddress}} that you expressed interest in. We have a showing available on {{showingDate}} at {{showingTime}}. This property features {{propertyFeatures}} and is priced at {{propertyPrice}}. Would you be interested in scheduling a viewing? I can also answer any questions you might have about the property or the neighborhood.`,
+        prompt: `Hi {{customer_name}}, this is {{senderName}} from {{companyName}}. I'm calling about the {{propertyType}} property at {{propertyAddress}} that you expressed interest in. We have a showing available on {{showingDate}} at {{showingTime}}. This property features {{propertyFeatures}} and is priced at {{propertyPrice}}. Would you be interested in scheduling a viewing? I can also answer any questions you might have about the property or the neighborhood.`,
         category: 'property-showing',
-        variables: ['recipientName', 'senderName', 'companyName', 'propertyType', 'propertyAddress', 'showingDate', 'showingTime', 'propertyFeatures', 'propertyPrice']
+        variables: ['customer_name', 'senderName', 'companyName', 'propertyType', 'propertyAddress', 'showingDate', 'showingTime', 'propertyFeatures', 'propertyPrice']
       },
       {
         id: 'market-update',
         name: 'Market Update',
         description: 'Share market insights and new listings',
-        prompt: `Hi {{recipientName}}, this is {{senderName}} from {{companyName}}. I wanted to reach out with a quick market update for {{location}}. We've seen some interesting activity in your area recently, and I thought you might be interested in knowing about some new {{propertyType}} listings that have come on the market. The current market conditions are {{marketConditions}}, and we're seeing {{marketTrend}}. Would you like me to send you some information about these new opportunities?`,
+        prompt: `Hi {{customer_name}}, this is {{senderName}} from {{companyName}}. I wanted to reach out with a quick market update for {{location}}. We've seen some interesting activity in your area recently, and I thought you might be interested in knowing about some new {{propertyType}} listings that have come on the market. The current market conditions are {{marketConditions}}, and we're seeing {{marketTrend}}. Would you like me to send you some information about these new opportunities?`,
         category: 'general',
-        variables: ['recipientName', 'senderName', 'companyName', 'location', 'propertyType', 'marketConditions', 'marketTrend']
+        variables: ['customer_name', 'senderName', 'companyName', 'location', 'propertyType', 'marketConditions', 'marketTrend']
       },
       {
         id: 'callback-request',
         name: 'Callback Request',
         description: 'Request a callback from interested leads',
-        prompt: `Hi {{recipientName}}, this is {{senderName}} from {{companyName}}. I'm calling because you left a message requesting a callback about {{inquiryType}}. I wanted to make sure I have all the details right - you were asking about {{specificDetails}}, correct? I'm available to discuss this further at your convenience. What would be the best time to call you back? I'm flexible and can work around your schedule.`,
+        prompt: `Hi {{customer_name}}, this is {{senderName}} from {{companyName}}. I'm calling because you left a message requesting a callback about {{inquiryType}}. I wanted to make sure I have all the details right - you were asking about {{specificDetails}}, correct? I'm available to discuss this further at your convenience. What would be the best time to call you back? I'm flexible and can work around your schedule.`,
         category: 'lead-followup',
-        variables: ['recipientName', 'senderName', 'companyName', 'inquiryType', 'specificDetails']
+        variables: ['customer_name', 'senderName', 'companyName', 'inquiryType', 'specificDetails']
       },
       {
         id: 'open-house-invitation',
         name: 'Open House Invitation',
         description: 'Invite leads to open house events',
-        prompt: `Hi {{recipientName}}, this is {{senderName}} from {{companyName}}. I'm calling to personally invite you to our open house this {{openHouseDate}} from {{openHouseTime}} at {{propertyAddress}}. This {{propertyType}} property is one of our most popular listings and features {{propertyHighlights}}. We're expecting a good turnout, so I wanted to make sure you had the details. There will be refreshments and I'll be available to answer any questions. Would you be able to make it?`,
+        prompt: `Hi {{customer_name}}, this is {{senderName}} from {{companyName}}. I'm calling to personally invite you to our open house this {{openHouseDate}} from {{openHouseTime}} at {{propertyAddress}}. This {{propertyType}} property is one of our most popular listings and features {{propertyHighlights}}. We're expecting a good turnout, so I wanted to make sure you had the details. There will be refreshments and I'll be available to answer any questions. Would you be able to make it?`,
         category: 'property-showing',
-        variables: ['recipientName', 'senderName', 'companyName', 'openHouseDate', 'openHouseTime', 'propertyAddress', 'propertyType', 'propertyHighlights']
+        variables: ['customer_name', 'senderName', 'companyName', 'openHouseDate', 'openHouseTime', 'propertyAddress', 'propertyType', 'propertyHighlights']
       }
     ];
   }

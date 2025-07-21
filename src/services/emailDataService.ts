@@ -1,1 +1,0 @@
-// EmailDataService is deprecated. All email features have been replaced by SMS and admin alert email. No email storage or metrics are used. 

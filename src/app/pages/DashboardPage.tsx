@@ -151,7 +151,12 @@ export default function DashboardPage({ onNavigate }: DashboardPageProps) {
           phone: lead.phone,
           info: lead.notes || ''
         })),
-        prompt: campaignPrompt
+        prompt: campaignPrompt,
+        assistantOverrides: {
+          variables: {
+            property_details: campaignPrompt
+          }
+        }
       };
 
       let campaignResponse;
@@ -203,6 +208,11 @@ export default function DashboardPage({ onNavigate }: DashboardPageProps) {
           phoneNumberId: process.env.NEXT_PUBLIC_PHONE_NUMBER_ID!,
           metadata: {
             customerInfo: customerInfo
+          },
+          assistantOverrides: {
+            variables: {
+              property_details: campaignPrompt
+            }
           }
         };
 

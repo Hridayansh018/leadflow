@@ -71,7 +71,7 @@ export default function EmailConfiguration({ isOpen, onClose }: EmailConfigurati
     setSelectedTemplate(template);
     // Set default variables based on template
     const defaultVars: Record<string, string> = {
-      recipientName: 'John Doe',
+      customer_name: 'John Doe',
       senderName: emailConfig.fromName,
       propertyName: 'Sample Property',
       propertyAddress: '123 Main St, City, State',

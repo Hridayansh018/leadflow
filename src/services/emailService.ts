@@ -49,7 +49,7 @@ class EmailService {
         htmlBody: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2 style="color: #2563eb;">Thank you for your interest!</h2>
-            <p>Dear {{recipientName}},</p>
+            <p>Dear {{customer_name}},</p>
             <p>Thank you for your interest in our real estate properties. We've received your inquiry and our team will be in touch with you shortly.</p>
             <p>In the meantime, feel free to browse our latest listings or contact us directly if you have any urgent questions.</p>
             <div style="background-color: #f3f4f6; padding: 20px; margin: 20px 0; border-radius: 8px;">
@@ -76,7 +76,7 @@ class EmailService {
         htmlBody: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2 style="color: #2563eb;">Property Showing Invitation</h2>
-            <p>Dear {{recipientName}},</p>
+            <p>Dear {{customer_name}},</p>
             <p>We're excited to invite you to view {{propertyName}}!</p>
             <div style="background-color: #f3f4f6; padding: 20px; margin: 20px 0; border-radius: 8px;">
               <h3 style="margin-top: 0;">Property Details</h3>
@@ -101,7 +101,7 @@ class EmailService {
         htmlBody: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2 style="color: #2563eb;">Campaign Update</h2>
-            <p>Dear {{recipientName}},</p>
+            <p>Dear {{customer_name}},</p>
             <p>Here's an update on your campaign: <strong>{{campaignName}}</strong></p>
             <div style="background-color: #f3f4f6; padding: 20px; margin: 20px 0; border-radius: 8px;">
               <h3 style="margin-top: 0;">Campaign Statistics</h3>
@@ -126,7 +126,7 @@ class EmailService {
         htmlBody: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2 style="color: #2563eb;">Welcome to LeadFlow!</h2>
-            <p>Dear {{recipientName}},</p>
+            <p>Dear {{customer_name}},</p>
             <p>Welcome to LeadFlow - your complete solution for real estate lead management and AI-powered calling.</p>
             <div style="background-color: #f3f4f6; padding: 20px; margin: 20px 0; border-radius: 8px;">
               <h3 style="margin-top: 0;">Getting Started</h3>

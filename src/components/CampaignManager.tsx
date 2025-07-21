@@ -178,7 +178,7 @@ export default function CampaignManager() {
     
     // Set default variables
     const defaultVars: Record<string, string> = {
-      recipientName: 'John Doe',
+      customer_name: 'John Doe',
       senderName: 'AI Call Pro',
       companyName: 'AI Call Pro CRM',
       propertyType: 'residential',
